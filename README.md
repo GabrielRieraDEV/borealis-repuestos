@@ -19,4 +19,19 @@ Desarrollado por Borealis Software Solutions. Opción contratada: Básica.
 
 ## Requisitos de desarrollo
 
-Python 3.12, `pip install -e .[dev]` (se crea en la Fase 0). Para el instalador: Windows con Inno Setup 6.
+Python 3.12 (no 3.13+). Para el instalador: Windows con Inno Setup 6.
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+
+# datos de desarrollo fuera de C:\ProgramData (la carpeta dev-data/ está en .gitignore)
+$env:REPUESTOS_DATA_DIR = "$PWD\dev-data"
+.\.venv\Scripts\python.exe -m repuestos
+
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\ruff.exe check src tests
+```
+
+`REPUESTOS_DATA_DIR` reemplaza la carpeta base `C:\ProgramData\BorealisRepuestos`; dentro se crean `datos\`,
+`respaldos\` y `logs\`.

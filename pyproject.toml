@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "repuestos"
+version = "0.1.0"
+description = "Inventario, ventas y caja · Romero Alfa 1 (Borealis Software Solutions)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "PySide6>=6.7,<7",
+    "python-escpos>=3.1,<4",
+    "reportlab>=4.2,<5",
+    "httpx>=0.27,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "pyinstaller>=6.10",
+]
+
+[project.gui-scripts]
+repuestos = "repuestos.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"repuestos.db.migrations" = ["*.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]

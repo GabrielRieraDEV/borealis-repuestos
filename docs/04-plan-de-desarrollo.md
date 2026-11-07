@@ -5,7 +5,7 @@ entregable que se puede probar y una lista de lo que **no** hay que hacer. Una f
 
 | Fase | Cuándo | Entregable | Hito de pago |
 |---|---|---|---|
-| ☐ 0 · Base | Día 1, mañana | Proyecto, base de datos, reglas de dinero con pruebas, login | — |
+| ☑ 0 · Base | Día 1, mañana | Proyecto, base de datos, reglas de dinero con pruebas, login | — |
 | ☐ 1 · Productos y tasa | Día 1, tarde | Catálogo, búsqueda, tasa BCV, **instalador preliminar** | Se instala en el local para que la dueña empiece a cargar productos |
 | ☐ 2 · Compras e inventario | Día 2 | Compras con costo promedio, ajustes, conteo, para pedir | — |
 | ☐ 3 · Caja y ventas | Día 3 | Venta, cobro mixto, vuelto, nota de entrega, cierre ciego | **Hito 2 (25 %)** |

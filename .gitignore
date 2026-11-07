@@ -17,3 +17,7 @@ htmlcov/
 datos/
 respaldos/
 logs/
+
+# datos de desarrollo (REPUESTOS_DATA_DIR)
+dev-data/
+*.egg-info/
