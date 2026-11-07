@@ -1,0 +1,6 @@
+# Binarios: nunca convertir saltos de línea (un PDF o un icono se dañarían al hacer checkout)
+*.pdf binary
+*.ico binary
+*.png binary
+*.db binary
+*.exe binary
