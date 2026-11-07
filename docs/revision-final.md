@@ -95,7 +95,7 @@ Las pruebas están en `tests/` (`pytest -q`: 296 pruebas, incluida la de corte d
 | RNF-01 sin licencia que caduque | ✅ | No hay activación, verificación en línea ni fechas de vencimiento en el código |
 | RNF-02 funciona sin internet | ✅ / ⏳ | Internet solo en `services/bcv.py`; si falla, se carga la tasa a mano. Criterio 9 en sitio |
 | RNF-03 cortes de luz | ✅ | WAL + `synchronous=FULL` (`test_pragmas`); `test_corte_de_luz_20_veces` (20/20, con ventas, fiado, abonos y anulaciones) |
-| RNF-04 Windows 10/11 64 bits, 1366×768, letra grande | ✅ / ⏳ | Pantallas revisadas a 1366×768 con letra grande; versión de Windows de la PC Samsung en sitio (PRD P1) |
+| RNF-04 Windows 10/11 64 bits, 1366×768, letra grande | ✅ / ⏳ | Pantallas revisadas a 1366×768 con letra grande. La PC del local tiene Windows 10 (foto) y monitor Samsung SyncMaster de 1440×900; falta confirmar 64 bits en sitio (PRD P1) |
 | RNF-05 rendimiento con 5.000 productos y 50.000 ventas | ✅ | `test_rnf05_rendimiento`: arranque 0,4 s · búsqueda 6 ms · venta 3 ms · reportes 0,8 s |
 | RNF-06 datos en ProgramData, el instalador no los toca | ✅ / ⏳ | `installer/repuestos.iss` (`uninsneveruninstall`, sin archivos en esa carpeta). Prueba de actualización en sitio (lista A) |
 | RNF-07 log rotativo sin datos personales | ✅ | `logging_setup.py` (5 × 1 MB); el log no registra clientes, montos de clientes ni contraseñas |
@@ -106,4 +106,4 @@ Las pruebas están en `tests/` (`pytest -q`: 296 pruebas, incluida la de corte d
 
 1. Versión de Windows de la PC Samsung (P1), impresora térmica real, lector real, Google Drive real (P5).
 2. Actualizar sobre la versión preliminar y comprobar que los datos se conservan (lista de pruebas en sitio, A).
-3. Recorrer los 12 criterios con la dueña (`docs/lista-de-pruebas-en-sitio.md`) y confirmar el fiado en USD (P4).
+3. Recorrer los 12 criterios con la dueña (`docs/visita/02-pruebas-en-sitio.md`) y confirmar el fiado en USD (P4).

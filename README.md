@@ -4,14 +4,18 @@ Sistema de inventario, ventas y caja para PARTES Y ACCESORIO DE MOTO ROMERO ALFA
 Desarrollado por Borealis Software Solutions. Opción contratada: Básica.
 
 **Estado: versión 1.0.0, fases 0 a 6 terminadas.** Falta lo que solo se puede hacer en el local: instalar, probar
-la impresora, el lector y Google Drive, y recorrer los 12 criterios con la dueña (`docs/lista-de-pruebas-en-sitio.md`).
+la impresora, el lector y Google Drive, y recorrer los 12 criterios con la dueña (`docs/visita/02-pruebas-en-sitio.md`).
 
 ## Para la entrega
 
 - `installer\Output\BorealisRepuestos-1.0.0-instalador.exe` — instalador final (se genera con `installer\build.ps1`).
 - `docs/guia-rapida.pdf` — guía de una página para imprimir (también en el programa: Ayuda → Guía rápida, F1).
   Se genera con `python installer\make_guide.py`; el contenido se edita ahí.
-- `docs/lista-de-pruebas-en-sitio.md` — instalación, equipo, los 12 criterios del PRD y el acta de entrega.
+- `docs/visita/` — **carpeta de la visita para Josner** (Markdown y PDF; `carpeta-de-la-visita.pdf` las junta para imprimir):
+  00 el programa en 10 minutos · 01 guía de la visita paso a paso · 02 pruebas en sitio y acta · 03 guion de
+  capacitación · 04 problemas y soluciones. Se regeneran con `python installer\make_visit_docs.py`.
+- **Modo de prueba:** acceso directo «Borealis Repuestos (modo de prueba)» (`BorealisRepuestos.exe --prueba`): base
+  aparte en `C:\ProgramData\BorealisRepuestos-prueba` para las pruebas de la visita y para practicar.
 - `docs/revision-final.md` — cada RF, RN y RNF con el archivo y la prueba que lo demuestran.
 
 ## Cómo arrancar con Claude Code

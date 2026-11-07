@@ -9,6 +9,7 @@ import textwrap
 from dataclasses import dataclass
 from decimal import Decimal
 
+from repuestos.config import BRAND_LINE, is_test_mode
 from repuestos.db.repositories.sales import Sale
 from repuestos.domain.money import from_db
 from repuestos.domain.sale import METHOD_LABELS, PaymentMethod
@@ -27,6 +28,10 @@ class BusinessHeader:
     rif: str
     address: str
     phone: str
+
+
+def _brand() -> list[str]:
+    return ["", *center(BRAND_LINE)]
 
 
 def clean(text: str) -> str:
@@ -50,7 +55,8 @@ def wrap(text: str, indent: str = "") -> list[str]:
 
 
 def _header(b: BusinessHeader) -> list[str]:
-    lines = center(b.name)
+    lines = center("*** MODO DE PRUEBA - SIN VALIDEZ ***") if is_test_mode() else []
+    lines += center(b.name)
     if b.rif:
         lines += center(f"RIF {b.rif}")
     if b.address:
@@ -129,6 +135,7 @@ def sale_ticket(
             out.append(f"  Vence: {format_date(credit_due_date)}")
     out.append(RULE)
     out += center("Gracias por su compra")
+    out += _brand()
     return out
 
 
@@ -192,6 +199,7 @@ def close_ticket(d: CloseTicketData, business: BusinessHeader) -> list[str]:
     out.append(RULE)
     out.append("")
     out.append("Firma: ______________________________")
+    out += _brand()
     return out
 
 
@@ -245,6 +253,7 @@ def credit_receipt(d: CreditReceiptData, business: BusinessHeader, reprint: bool
     out.append(lr("SALDO PENDIENTE", format_usd(d.balance_after)))
     out.append(RULE)
     out += center("Gracias por su pago")
+    out += _brand()
     return out
 
 
@@ -268,4 +277,5 @@ def to_order_ticket(lines: list, business: BusinessHeader, printed_at: str) -> l
         stock = f"hay {_qty(line.stock)} {unit} / mín. {_qty(line.min_stock)}"
         out.append(lr(f"  {stock}", line.last_supplier[:20] if line.last_supplier else ""))
     out.append(RULE)
+    out += _brand()
     return out

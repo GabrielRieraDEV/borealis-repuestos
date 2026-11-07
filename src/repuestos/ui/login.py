@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from repuestos.domain.users import User
 from repuestos.services import auth_service
+from repuestos.ui.brand import brand_label, test_mode_banner
 
 
 class LoginDialog(QDialog):
@@ -45,10 +47,14 @@ class LoginDialog(QDialog):
         buttons.rejected.connect(self.reject)
 
         layout = QVBoxLayout(self)
+        banner = test_mode_banner()
+        if banner is not None:
+            layout.addWidget(banner)
         layout.addWidget(title)
         layout.addLayout(form)
         layout.addWidget(self._error)
         layout.addWidget(buttons)
+        layout.addWidget(brand_label(), 0, Qt.AlignmentFlag.AlignRight)
         self._username.setFocus()
 
     def _try_login(self) -> None:

@@ -49,3 +49,26 @@ class Paths:
 def get_paths() -> Paths:
     override = os.environ.get(ENV_DATA_DIR)
     return Paths(Path(override) if override else _default_base_dir())
+
+
+# ------------------------------------------------------------------ marca
+
+BRAND = "Borealis Software Solutions"
+BRAND_LINE = f"Sistema hecho por {BRAND}"
+
+# ------------------------------------------------------------------ modo de prueba
+# Acceso directo "Borealis Repuestos (modo de prueba)": base aparte para las pruebas de la visita y para practicar.
+# Nada de lo que se haga ahí toca los datos reales (ni los correlativos de las notas de entrega).
+
+TEST_FLAG = "--prueba"
+ENV_TEST_MODE = "REPUESTOS_PRUEBA"
+
+
+def enable_test_mode() -> None:
+    os.environ[ENV_TEST_MODE] = "1"
+    if not os.environ.get(ENV_DATA_DIR):
+        os.environ[ENV_DATA_DIR] = str(_default_base_dir().with_name("BorealisRepuestos-prueba"))
+
+
+def is_test_mode() -> bool:
+    return os.environ.get(ENV_TEST_MODE) == "1"

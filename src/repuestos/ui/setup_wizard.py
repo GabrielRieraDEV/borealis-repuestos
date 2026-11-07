@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWizardPage,
 )
 
+from repuestos.config import BRAND
 from repuestos.domain.users import User
 from repuestos.formatting import parse_decimal
 from repuestos.services import setup_service
@@ -37,7 +38,7 @@ class SetupWizard(QWizard):
         super().__init__(parent)
         self._conn = conn
         self.user: User | None = None
-        self.setWindowTitle("Configuración inicial")
+        self.setWindowTitle(f"Configuración inicial · {BRAND}")
         self.setMinimumWidth(560)
         self.setButtonText(QWizard.WizardButton.NextButton, "Siguiente >")
         self.setButtonText(QWizard.WizardButton.BackButton, "< Atrás")

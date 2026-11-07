@@ -11,7 +11,7 @@ from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QGridLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
 from repuestos import __version__
-from repuestos.config import get_paths
+from repuestos.config import BRAND, get_paths, is_test_mode
 from repuestos.domain.money import ZERO
 from repuestos.domain.users import ROLE_LABELS, User
 from repuestos.formatting import format_date, format_rate, format_usd
@@ -26,6 +26,7 @@ from repuestos.services import (
 from repuestos.services.rate_service import SOURCE_LABELS
 from repuestos.ui.admin_dialogs import CategoriesDialog, SettingsDialog, UsersDialog
 from repuestos.ui.backup_ui import BackupDialog, BackupManager
+from repuestos.ui.brand import brand_label, test_mode_banner
 from repuestos.ui.cash_window import CashWindow
 from repuestos.ui.credit_window import CreditWindow
 from repuestos.ui.inventory_window import InventoryWindow
@@ -52,7 +53,10 @@ class MainWindow(QMainWindow):
         self.backup.finished.connect(self._backup_finished)
         self._backup_error: str | None = None
         business = settings_service.load(conn).business_name
-        self.setWindowTitle(f"{business or 'Borealis Repuestos'} — Inventario, ventas y caja")
+        prefix = "MODO DE PRUEBA — " if is_test_mode() else ""
+        self.setWindowTitle(
+            f"{prefix}{business or 'Borealis Repuestos'} — Inventario, ventas y caja · Borealis Repuestos"
+        )
         self.resize(1200, 720)
 
         self._build_menu()
@@ -157,11 +161,15 @@ class MainWindow(QMainWindow):
 
         center = QWidget()
         layout = QVBoxLayout(center)
+        banner = test_mode_banner()
+        if banner is not None:
+            layout.addWidget(banner)
         welcome = QLabel(f"Hola, {self.user.full_name}")
         welcome.setStyleSheet("font-size: 18pt;")
         layout.addWidget(welcome)
         layout.addLayout(grid)
         layout.addWidget(self.alerts, 1)
+        layout.addWidget(brand_label(), 0, Qt.AlignmentFlag.AlignRight)
         self.setCentralWidget(center)
 
     def _build_status_bar(self) -> None:
@@ -328,7 +336,7 @@ class MainWindow(QMainWindow):
             "Acerca del programa",
             f"<b>Borealis Repuestos</b> versión {__version__}<br>"
             "Inventario, ventas y caja para Romero Alfa 1.<br><br>"
-            "Hecho por Borealis Software Solutions. Sin licencia que caduque: el programa es suyo.<br>"
+            f"Hecho por <b>{BRAND}</b>. Sin licencia que caduque: el programa es suyo.<br>"
             f"Datos en {get_paths().base}",
         )
 

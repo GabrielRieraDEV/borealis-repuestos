@@ -15,6 +15,8 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Frame, FrameBreak, KeepTogether, PageTemplate, Paragraph, Spacer
 from reportlab.platypus.doctemplate import BaseDocTemplate
 
+from repuestos.config import BRAND_LINE
+
 ROOT = Path(__file__).resolve().parents[1]
 
 TITLE = "Guía rápida · Borealis Repuestos"
@@ -119,7 +121,13 @@ def write_pdf(path: Path) -> None:
         Frame(margin + col_w + 6 * mm, margin, col_w, body_h, id="c2", showBoundary=0),
     ]
     doc = BaseDocTemplate(str(path), pagesize=letter, title=TITLE, author="Borealis Software Solutions")
-    doc.addPageTemplates([PageTemplate(id="una", frames=frames)])
+
+    def footer(canvas, _doc) -> None:
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(colors.HexColor("#6b7a90"))
+        canvas.drawCentredString(width / 2, 7 * mm, f"Borealis Repuestos · {BRAND_LINE}")
+
+    doc.addPageTemplates([PageTemplate(id="una", frames=frames, onPage=footer)])
     story = [Paragraph(TITLE, title), Paragraph(SUBTITLE, sub)]
     story.append(FrameBreak())
     for n, (title_text, steps) in enumerate(SECTIONS):

@@ -7,7 +7,7 @@ import sys
 import traceback
 from types import TracebackType
 
-from repuestos.config import APP_NAME, get_paths
+from repuestos.config import APP_NAME, TEST_FLAG, enable_test_mode, get_paths, is_test_mode
 from repuestos.db import migrate
 from repuestos.db.connection import connect
 from repuestos.logging_setup import setup_logging
@@ -31,10 +31,12 @@ def _install_excepthook() -> None:
 
 
 def main() -> int:
+    if TEST_FLAG in sys.argv:
+        enable_test_mode()
     paths = get_paths()
     paths.ensure()
     setup_logging(paths.log_dir)
-    log.info("Arrancando %s; datos en %s", APP_NAME, paths.base)
+    log.info("Arrancando %s%s; datos en %s", APP_NAME, " (MODO DE PRUEBA)" if is_test_mode() else "", paths.base)
 
     conn = connect(paths.db_path)
     migrate.apply_migrations(conn)

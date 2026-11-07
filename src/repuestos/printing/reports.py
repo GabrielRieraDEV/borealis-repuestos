@@ -14,6 +14,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import Flowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from repuestos.config import BRAND_LINE, is_test_mode
 from repuestos.db.repositories.inventory import ToOrderLine
 from repuestos.domain.products import UNIT_SHORT, Unit
 from repuestos.domain.sale import METHOD_LABELS, PaymentMethod
@@ -62,6 +63,7 @@ class _NumberedCanvas(Canvas):
             self.setFont("Helvetica", 8)
             self.setFillColor(colors.HexColor("#666666"))
             self.drawRightString(letter[0] - 15 * mm, 10 * mm, f"Página {self._pageNumber} de {total}")
+            self.drawString(15 * mm, 10 * mm, f"Borealis Repuestos · {BRAND_LINE}")
             super().showPage()
         super().save()
 
@@ -92,7 +94,8 @@ def _build(path: Path, business: BusinessHeader, title: str, subtitle: str, stor
         str(path), pagesize=letter, leftMargin=15 * mm, rightMargin=15 * mm, topMargin=15 * mm, bottomMargin=18 * mm,
         title=title, author=business.name,
     )  # fmt: skip
-    head = [
+    test = [Paragraph("<b>MODO DE PRUEBA · datos de práctica, sin validez</b>", TITLE)] if is_test_mode() else []
+    head = test + [
         Paragraph(f"<b>{business.name}</b>", NORMAL),
         Paragraph(
             " · ".join(
