@@ -11,15 +11,24 @@ from PySide6.QtWidgets import QGridLayout, QLabel, QMainWindow, QMessageBox, QPu
 from repuestos.domain.money import ZERO
 from repuestos.domain.users import ROLE_LABELS, User
 from repuestos.formatting import format_date, format_rate, format_usd
-from repuestos.services import cash_service, credit_service, product_service, rate_service, settings_service
+from repuestos.services import (
+    backup_service,
+    cash_service,
+    credit_service,
+    product_service,
+    rate_service,
+    settings_service,
+)
 from repuestos.services.rate_service import SOURCE_LABELS
 from repuestos.ui.admin_dialogs import CategoriesDialog, SettingsDialog, UsersDialog
+from repuestos.ui.backup_ui import BackupDialog, BackupManager
 from repuestos.ui.cash_window import CashWindow
 from repuestos.ui.credit_window import CreditWindow
 from repuestos.ui.inventory_window import InventoryWindow
 from repuestos.ui.products_window import ProductsWindow
 from repuestos.ui.purchases_window import PurchasesWindow
 from repuestos.ui.rate import FETCH_INTERVAL_MS, BcvFetcher, RateDialog
+from repuestos.ui.reports_window import AuditWindow, ReportsWindow
 from repuestos.ui.sale_window import SaleWindow
 from repuestos.ui.sales_list import SalesListWindow
 
@@ -34,6 +43,10 @@ class MainWindow(QMainWindow):
         self._conn = conn
         self.user = user
         self.logout_requested = False
+        self.restore_path = None  # respaldo a restaurar: app.py cierra la base, restaura y reinicia (RF-91)
+        self.backup = BackupManager(self)
+        self.backup.finished.connect(self._backup_finished)
+        self._backup_error: str | None = None
         business = settings_service.load(conn).business_name
         self.setWindowTitle(f"{business or 'Borealis Repuestos'} — Inventario, ventas y caja")
         self.resize(1200, 720)
@@ -56,6 +69,12 @@ class MainWindow(QMainWindow):
 
         self.refresh_status()
         QTimer.singleShot(0, self.fetcher.start)  # al arrancar (RF-20), sin bloquear
+        self._startup_backup = QTimer(self)  # al arrancar si el último tiene más de 12 h (RF-90)
+        self._startup_backup.setSingleShot(True)
+        self._startup_backup.setInterval(1500)
+        self._startup_backup.timeout.connect(lambda: self.backup.start())
+        if backup_service.needs_backup(conn):
+            self._startup_backup.start()
 
     # ------------------------------------------------------------------ construcción
 
@@ -96,7 +115,7 @@ class MainWindow(QMainWindow):
             ]
         buttons += [
             self._big_button("Fiado", self.open_credit),
-            self._big_button("Reportes", enabled=False),
+            self._big_button("Reportes", self.open_reports),
             self._big_button("Tasa BCV", self.open_rate),
         ]
         if owner:
@@ -104,6 +123,8 @@ class MainWindow(QMainWindow):
                 self._big_button("Categorías", self.open_categories),
                 self._big_button("Usuarios", self.open_users),
                 self._big_button("Configuración", self.open_settings),
+                self._big_button("Respaldo", self.open_backup),
+                self._big_button("Bitácora", self.open_audit),
             ]
         for i, b in enumerate(buttons):
             grid.addWidget(b, i // 4, i % 4)
@@ -179,7 +200,37 @@ class MainWindow(QMainWindow):
                 f"• Fiado vencido: <b>{n}</b> cliente{'s' if n != 1 else ''} por <b>{format_usd(total)}</b>."
                 ' <a href="fiado">Ver deudores</a>'
             )
+        self._refresh_backup_label(alerts)
         self.alerts.setText("<br>".join(alerts))
+
+    def _refresh_backup_label(self, alerts: list[str]) -> None:
+        st = backup_service.status(self._conn)
+        if self._backup_error:
+            self.backup_label.setText("Respaldo: falló")
+            self.backup_label.setToolTip(self._backup_error)
+            self.backup_label.setStyleSheet(ERROR_STYLE)
+            alerts.append("• El último respaldo falló. Avise a Borealis.")
+            return
+        self.backup_label.setToolTip("")
+        if st.last_local is None:
+            self.backup_label.setText("Respaldo: nunca")
+            self.backup_label.setStyleSheet(WARN_STYLE)
+            return
+        if not st.cloud_configured:
+            self.backup_label.setText(f"Respaldo: local {st.last_local:%d/%m %H:%M} (sin nube)")
+            self.backup_label.setStyleSheet(WARN_STYLE)
+            if self.user.is_owner:
+                alerts.append("• Falta configurar la carpeta de la nube para el respaldo (Configuración).")
+            return
+        when = f"{st.last_cloud:%d/%m %H:%M}" if st.last_cloud else "nunca"
+        self.backup_label.setText(f"Respaldo en la nube: {when}")
+        self.backup_label.setStyleSheet(WARN_STYLE if st.cloud_stale else "")
+        if st.cloud_stale:
+            alerts.append("• El respaldo en la nube tiene más de 48 horas. Revise que Google Drive esté abierto.")
+
+    def _backup_finished(self, ok: bool, message: str) -> None:
+        self._backup_error = None if ok or "nube" in message else message
+        self.refresh_status()
 
     # ------------------------------------------------------------------ acciones
 
@@ -198,8 +249,23 @@ class MainWindow(QMainWindow):
         self.refresh_status()
 
     def open_cash(self) -> None:
-        CashWindow(self._conn, self.user, self).exec()
+        # al cerrar caja: respaldo + PDF en la nube (RF-62, RF-90, RF-92)
+        CashWindow(self._conn, self.user, self, on_closed=lambda: self.backup.start(with_pdfs=True)).exec()
         self.refresh_status()
+
+    def open_reports(self) -> None:
+        ReportsWindow(self._conn, self.user, self).exec()
+
+    def open_audit(self) -> None:
+        AuditWindow(self._conn, self.user, self).exec()
+
+    def open_backup(self) -> None:
+        dialog = BackupDialog(self._conn, self.user, self.backup, self)
+        dialog.exec()
+        self.refresh_status()
+        if dialog.restore_path is not None:
+            self.restore_path = dialog.restore_path
+            self.close()
 
     def open_credit(self) -> None:
         CreditWindow(self._conn, self.user, self).exec()
@@ -252,5 +318,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:  # noqa: N802
         self._fetch_timer.stop()
         self._status_timer.stop()
+        self._startup_backup.stop()
         self.fetcher.shutdown()
+        self.backup.wait()
         super().closeEvent(event)

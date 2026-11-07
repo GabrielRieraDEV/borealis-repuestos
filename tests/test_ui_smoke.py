@@ -602,3 +602,116 @@ def test_main_window_aviso_de_fiado_vencido(app, conn, owner, open_shop, credit_
     m.fetcher.start = lambda: None
     assert "Fiado vencido: <b>1</b> cliente" in m.alerts.text()
     m.close()
+
+
+# ------------------------------------------------------------------ Fase 5
+
+
+def test_reports_window_por_rol_y_vista_previa(app, conn, owner, open_shop, monkeypatch) -> None:
+    import repuestos.ui.reports_window as rw
+
+    def buttons(w):
+        return [b for b in w.findChildren(QtWidgets.QPushButton) if b.text() == "Ver"]
+
+    assert len(buttons(rw.ReportsWindow(conn, owner))) == 5
+    assert len(buttons(rw.ReportsWindow(conn, make_seller(conn, owner)))) == 1
+    shown: list = []
+    monkeypatch.setattr(rw.PdfPreviewDialog, "exec", lambda self: shown.append(self.document.pageCount()))
+    w = rw.ReportsWindow(conn, owner)
+    for b in buttons(w):
+        b.click()
+    assert len(shown) == 5 and all(n >= 1 for n in shown)
+
+
+def test_audit_window_filtra(app, conn, owner) -> None:
+    from repuestos.ui.reports_window import AuditWindow
+
+    w = AuditWindow(conn, owner)
+    assert w.table.rowCount() >= 2
+    w.action.setCurrentIndex(w.action.findData("SETUP_COMPLETED"))
+    assert w.table.rowCount() == 1 and w.table.item(0, 3).text() == "Configuración inicial"
+    with pytest.raises(PermissionError):
+        AuditWindow(conn, make_seller(conn, owner))
+
+
+@pytest.fixture
+def real_store(owner):
+    """Base en la carpeta de datos configurada (la que usa el respaldo de fondo)."""
+    from repuestos.config import get_paths
+    from repuestos.db.connection import connect
+    from repuestos.db.migrate import apply_migrations
+    from repuestos.services import setup_service
+
+    paths = get_paths()
+    paths.ensure()
+    c = connect(paths.db_path)
+    apply_migrations(c)
+    o = setup_service.complete_setup(
+        c, setup_service.SetupData("duena", "Dueña", "clave123", "R", "V-1", "", "", D("5"))
+    )
+    yield paths, c, o
+    c.close()
+
+
+def test_backup_manager_en_segundo_plano(app, real_store) -> None:
+    from repuestos.services import backup_service
+    from repuestos.ui.backup_ui import BackupManager
+
+    paths, c, _ = real_store
+    results: list = []
+    m = BackupManager()
+    m.finished.connect(lambda ok, msg: results.append((ok, msg)))
+    m.start()
+    m.start(with_pdfs=True)  # mientras corre: se encola uno más
+    for _ in range(100):
+        QTest.qWait(50)
+        if len(results) == 2:
+            break
+    assert [ok for ok, _ in results] == [True, True], results
+    assert backup_service.list_backups(paths) and not backup_service.needs_backup(c)
+
+
+def test_backup_dialog_doble_confirmacion(app, real_store, monkeypatch, no_dialogs) -> None:
+    import repuestos.ui.backup_ui as bu
+    from repuestos.services import backup_service
+
+    paths, c, o = real_store
+    backup_service.run_backup(paths)
+    d = bu.BackupDialog(c, o, bu.BackupManager())
+    assert d.table.rowCount() == 1
+    d.table.selectRow(0)
+    monkeypatch.setattr(bu.QInputDialog, "getText", lambda *a, **k: ("restaurar", True))
+    d._restore_selected()
+    assert d.restore_path == backup_service.list_backups(paths)[0]
+    d2 = bu.BackupDialog(c, o, bu.BackupManager())
+    d2.table.selectRow(0)
+    monkeypatch.setattr(bu.QInputDialog, "getText", lambda *a, **k: ("no", True))
+    d2._restore_selected()
+    assert d2.restore_path is None and no_dialogs[-1] == "No se restauró nada."
+
+
+def test_main_window_reportes_respaldo_y_cierre_de_caja(app, conn, owner, open_shop, monkeypatch, no_dialogs) -> None:
+    import repuestos.ui.cash_window as cw
+
+    m = MainWindow(conn, owner)
+    m.fetcher.start = lambda: None
+    started: list = []
+    m.backup.start = lambda with_pdfs=False: started.append(with_pdfs)
+    enabled = {b.text() for b in m.findChildren(QtWidgets.QPushButton) if b.isEnabled()}
+    assert {"Reportes", "Respaldo", "Bitácora"} <= enabled
+    assert m.backup_label.text() == "Respaldo: nunca"
+
+    class FakeClose:
+        def __init__(self, *a):
+            self.values = (D("20"), D("500"))
+            self.notes = QtWidgets.QLineEdit()
+
+        def exec(self):
+            return QtWidgets.QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(cw, "CloseDialog", FakeClose)
+    monkeypatch.setattr(cw, "print_with_fallback", lambda *a: True)
+    w = cw.CashWindow(conn, owner, on_closed=lambda: m.backup.start(with_pdfs=True))
+    w._close()
+    assert started == [True]  # cerrar caja dispara el respaldo con los PDF de la nube
+    m.close()

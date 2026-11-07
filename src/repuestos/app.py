@@ -41,7 +41,7 @@ def main() -> int:
 
     from PySide6.QtWidgets import QApplication, QDialog
 
-    from repuestos.services import auth_service, settings_service, setup_service
+    from repuestos.services import auth_service, backup_service, report_service, settings_service, setup_service
     from repuestos.tools.verify_stock import verify_and_log
     from repuestos.ui.login import LoginDialog
     from repuestos.ui.main_window import MainWindow
@@ -59,6 +59,11 @@ def main() -> int:
             return 0
 
     apply_theme(app, settings_service.load(conn).large_font)
+
+    # RN-13: foto de la inversión del mes anterior en el primer arranque del mes, antes de cualquier operación
+    taken = report_service.ensure_monthly_snapshot(conn)
+    if taken:
+        log.info("Foto mensual tomada para %s", taken)
 
     # RF-44: silenciosa si todo cuadra; si no, bitácora y aviso a la dueña
     mismatches = verify_and_log(conn)
@@ -78,11 +83,43 @@ def main() -> int:
             mismatches = []
         code = app.exec()
         auth_service.logout(conn, user)
+        if window.restore_path is not None:
+            return _restore_and_restart(conn, paths, user, window.restore_path)
         if not window.logout_requested:
             break
     conn.close()
+    # RF-90 / RF-92: respaldo y PDF de la nube al salir (rápido; si falla queda en el log)
+    try:
+        backup_service.run_backup(paths, with_pdfs=True)
+    except Exception:
+        log.exception("Falló el respaldo al salir")
     log.info("Cierre normal")
     return code
+
+
+def _restore_and_restart(conn, paths, user, backup) -> int:
+    """RF-91: se cierra la base (modo exclusivo), se restaura y el programa se abre de nuevo."""
+    from PySide6.QtCore import QProcess
+    from PySide6.QtWidgets import QMessageBox
+
+    from repuestos.services import backup_service
+
+    conn.close()
+    try:
+        previous = backup_service.restore(paths, user, backup)
+    except Exception as exc:
+        log.exception("No se pudo restaurar %s", backup)
+        QMessageBox.critical(None, APP_NAME, f"No se pudo restaurar el respaldo. Los datos no cambiaron.\n\n{exc}")
+        return 1
+    QMessageBox.information(
+        None,
+        APP_NAME,
+        f"Respaldo restaurado. La copia de los datos anteriores quedó como {previous.name}.\n"
+        "El programa se abrirá de nuevo.",
+    )
+    args = sys.argv[1:] if getattr(sys, "frozen", False) else sys.argv
+    QProcess.startDetached(sys.executable, args)
+    return 0
 
 
 if __name__ == "__main__":

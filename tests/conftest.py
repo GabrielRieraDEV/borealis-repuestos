@@ -38,3 +38,9 @@ def owner(conn: sqlite3.Connection):
             rounding_multiple=Decimal("5.00"),
         ),
     )
+
+
+@pytest.fixture(autouse=True)
+def _isolated_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ninguna prueba toca ProgramData: respaldos, tickets y reportes van a una carpeta temporal."""
+    monkeypatch.setenv("REPUESTOS_DATA_DIR", str(tmp_path / "BorealisRepuestos"))

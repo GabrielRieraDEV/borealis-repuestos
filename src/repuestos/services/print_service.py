@@ -144,3 +144,85 @@ def save_credit_receipt_pdf(conn: sqlite3.Connection, credit_payment_id: int, fo
     payment, _ = credit_service.payment_detail(conn, credit_payment_id)
     lines = credit_receipt_lines(conn, credit_payment_id, reprint=True)
     return printer.save_pdf((folder or tickets_dir()) / f"{payment.doc_number}.pdf", lines, payment.doc_number)
+
+
+# ------------------------------------------------------------------ reportes en PDF (RF-80 a RF-84, RF-92)
+
+
+def reports_dir() -> Path:
+    return get_paths().base / "reportes"
+
+
+def _stamp() -> str:
+    from datetime import datetime
+
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def daily_sales_pdf(conn: sqlite3.Connection, user: User, day, folder: Path | None = None) -> Path:
+    from repuestos.printing import reports
+    from repuestos.services import report_service
+
+    data = report_service.daily_sales(conn, user, day)
+    return reports.daily_sales_pdf(
+        (folder or reports_dir()) / f"ventas_{day.isoformat()}_{_stamp()}.pdf", business_header(conn), data
+    )
+
+
+def period_sales_pdf(conn: sqlite3.Connection, user: User, start, end, folder: Path | None = None) -> Path:
+    from repuestos.printing import reports
+    from repuestos.services import report_service
+
+    data = report_service.period_sales(conn, user, start, end)
+    name = f"monto_vendido_{start.isoformat()}_{end.isoformat()}_{_stamp()}.pdf"
+    return reports.period_sales_pdf((folder or reports_dir()) / name, business_header(conn), data)
+
+
+def month_summary_pdf(conn: sqlite3.Connection, user: User, year: int, month: int, folder: Path | None = None) -> Path:
+    from repuestos.printing import reports
+    from repuestos.services import report_service
+
+    data = report_service.month_summary(conn, user, year, month)
+    name = f"resumen_{year:04d}-{month:02d}_{_stamp()}.pdf"
+    return reports.month_summary_pdf((folder or reports_dir()) / name, business_header(conn), data)
+
+
+def valued_inventory_pdf(conn: sqlite3.Connection, user: User, folder: Path | None = None) -> Path:
+    from repuestos.printing import reports
+    from repuestos.services import report_service
+
+    data = report_service.valued_inventory(conn, user)
+    return reports.valued_inventory_pdf(
+        (folder or reports_dir()) / f"inventario_{_stamp()}.pdf", business_header(conn), data
+    )
+
+
+def to_order_pdf(conn: sqlite3.Connection, user: User, folder: Path | None = None) -> Path:
+    from repuestos.printing import reports
+    from repuestos.services import report_service
+
+    data = report_service.to_order(conn, user)
+    return reports.to_order_pdf((folder or reports_dir()) / f"para_pedir_{_stamp()}.pdf", business_header(conn), data)
+
+
+CLOUD_INVENTORY_PDF = "Inventario de hoy.pdf"
+CLOUD_SUMMARY_PDF = "Resumen del mes.pdf"
+
+
+def cloud_pdfs(conn: sqlite3.Connection, folder: Path) -> list[Path]:
+    """RF-92: para que la dueña los abra desde el celular con Google Drive. Los genera el programa (sin usuario)."""
+    from datetime import date
+
+    from repuestos.printing import reports
+    from repuestos.services import report_service
+
+    today = date.today()
+    header = business_header(conn)
+    return [
+        reports.valued_inventory_pdf(
+            folder / CLOUD_INVENTORY_PDF, header, report_service.system_valued_inventory(conn)
+        ),
+        reports.month_summary_pdf(
+            folder / CLOUD_SUMMARY_PDF, header, report_service.system_month_summary(conn, today.year, today.month)
+        ),
+    ]

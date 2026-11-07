@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -86,10 +87,17 @@ class CloseDialog(QDialog):
 
 
 class CashWindow(QDialog):
-    def __init__(self, conn: sqlite3.Connection, user: User, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        conn: sqlite3.Connection,
+        user: User,
+        parent: QWidget | None = None,
+        on_closed: Callable[[], None] | None = None,
+    ) -> None:
         super().__init__(parent)
         self._conn = conn
         self._user = user
+        self._on_closed = on_closed
         self.setWindowTitle("Caja")
         self.resize(1000, 640)
         self.tabs = QTabWidget()
@@ -297,6 +305,8 @@ class CashWindow(QDialog):
             lambda: print_service.print_close(self._conn, self._user, result.session_id),
             lambda: print_service.save_close_pdf(self._conn, self._user, result.session_id),
         )
+        if self._on_closed is not None:
+            self._on_closed()  # respaldo después del COMMIT del cierre
         self.refresh()
 
     # ------------------------------------------------------------------ historial (dueña)

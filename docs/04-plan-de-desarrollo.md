@@ -10,7 +10,7 @@ entregable que se puede probar y una lista de lo que **no** hay que hacer. Una f
 | ☑ 2 · Compras e inventario | Día 2 | Compras con costo promedio, ajustes, conteo, para pedir | — |
 | ☑ 3 · Caja y ventas | Día 3 | Venta, cobro mixto, vuelto, nota de entrega, cierre ciego | **Hito 2 (25 %)** |
 | ☑ 4 · Fiado | Día 4, mañana | Clientes, venta a fiado, abonos, estado de cuenta | — |
-| ☐ 5 · Reportes y respaldo | Día 4, tarde | Reportes, resumen del mes, respaldo local y en la nube | — |
+| ☑ 5 · Reportes y respaldo | Día 4, tarde | Reportes, resumen del mes, respaldo local y en la nube | — |
 | ☐ 6 · Entrega | Visita | Instalador final, pruebas en sitio, guía rápida, capacitación | **Hito 3 (25 %)** |
 
 **Regla de oro del plazo:** si una fase se atrasa, se recorta lo marcado **d** en el PRD, nunca una regla de dinero ni una
