@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+build/
+dist/
+*.spec.bak
+installer/Output/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# datos locales de desarrollo (nunca subir bases de clientes)
+*.db
+*.db-wal
+*.db-shm
+datos/
+respaldos/
+logs/
