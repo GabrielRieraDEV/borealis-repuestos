@@ -284,6 +284,7 @@ class _FakePayment:
 
     payments: list = []
     change_usd = D("0")
+    on_credit = False
 
     def __init__(self, *args, **kwargs) -> None:
         pass
@@ -454,4 +455,150 @@ def test_main_window_blocks_sale_without_cash(app, conn, owner, no_dialogs) -> N
     m.open_sale()
     assert "caja está cerrada" in no_dialogs[-1].lower()
     assert m.cash_label.text() == "Caja: cerrada"
+    m.close()
+
+
+# ------------------------------------------------------------------ Fase 4
+
+
+@pytest.fixture
+def credit_customer(conn, owner, open_shop):
+    from repuestos.services import credit_service, customer_service
+
+    c = customer_service.create(conn, owner, "Jose Perez", "V12345678")
+    return credit_service.set_customer_credit(conn, owner, c.id, True)
+
+
+def test_payment_dialog_fiado_con_f6(app) -> None:
+    from repuestos.ui.sale_window import PaymentDialog
+
+    d = PaymentDialog(D("2890.00"), D("12.50"), D("231.0468"), False, credit_customer="Jose Perez")
+    _show(d)
+    QTest.keyClick(d, Qt.Key.Key_F1)
+    QTest.keyClicks(d.amount, "1000")
+    QTest.keyClick(d.amount, Qt.Key.Key_Return)
+    assert not d.charge_button.isEnabled()
+    QTest.keyClick(d, Qt.Key.Key_F6)
+    assert d.on_credit and d.charge_button.isEnabled()
+    assert d.due_label.text() == "A fiado: Bs 1.890,00  ·  deuda USD 8,18"
+    assert d.table.rowCount() == 2
+    QTest.keyClick(d, Qt.Key.Key_F6)  # otra vez F6 lo quita
+    assert not d.on_credit and not d.charge_button.isEnabled()
+    QTest.keyClick(d, Qt.Key.Key_F6)
+    QTest.keyClick(d, Qt.Key.Key_F9)
+    assert d.result() == QtWidgets.QDialog.DialogCode.Accepted and d.on_credit
+
+
+def test_payment_dialog_sin_fiado_para_consumidor_final(app) -> None:
+    from repuestos.ui.sale_window import PaymentDialog
+
+    d = PaymentDialog(D("2890.00"), D("12.50"), D("231.0468"), False)
+    _show(d)
+    QTest.keyClick(d, Qt.Key.Key_F6)
+    assert not d.on_credit
+    assert not d.method.model().item(d.method.findData("CREDIT")).isEnabled()
+
+
+def test_sale_window_venta_a_fiado_y_limite(app, conn, owner, open_shop, credit_customer, monkeypatch, no_dialogs):
+    import repuestos.ui.sale_window as sw
+    from repuestos.services import credit_service
+
+    credit_service.set_customer_credit(conn, owner, credit_customer.id, True, limit_usd=D("20"))
+    seller = make_seller(conn, owner)
+    monkeypatch.setattr(sw, "print_with_fallback", lambda *args: True)
+    asked: list = []
+    monkeypatch.setattr(sw, "ask_owner_authorization", lambda *args: asked.append(args) or owner.id)
+    _FakePayment.payments = []
+    _FakePayment.change_usd = D("0")
+    _FakePayment.on_credit = True
+    monkeypatch.setattr(sw, "PaymentDialog", _FakePayment)
+    try:
+        w = sw.SaleWindow(conn, seller)
+        _show(w)
+        for _ in range(2):
+            w.customer = credit_service.statement(conn, credit_customer.id).customer
+            w._add(open_shop[0].id, D("1"))
+            w._charge()
+        assert len(asked) == 1  # la segunda supera el límite de 20 USD
+        assert credit_service.customer_balance(conn, credit_customer.id) == D("25.02")
+    finally:
+        _FakePayment.on_credit = False
+
+
+def test_credit_window_abono_y_estado_de_cuenta(app, conn, owner, open_shop, credit_customer, monkeypatch, no_dialogs):
+    import repuestos.ui.credit_window as cw
+    from repuestos.domain.sale import PaymentInput, PaymentMethod
+    from repuestos.services import credit_service, sale_service
+    from repuestos.services.sale_service import CartItem
+
+    sale_service.charge(
+        conn,
+        owner,
+        [CartItem(open_shop[0].id, D("1"))],
+        [PaymentInput(PaymentMethod.CASH_VES, D("1000"))],
+        D("231.0468"),
+        credit_customer.id,
+        on_credit=True,
+    )
+    monkeypatch.setattr(cw, "print_with_fallback", lambda *args: True)
+    w = cw.CreditWindow(conn, owner)
+    assert w.debtors.rowCount() == 1 and w.total.text() == "Total por cobrar: USD 8,18"
+
+    d = cw.CreditPaymentDialog(conn, owner, credit_customer.id)
+    d.method.setCurrentIndex(d.method.findData("CASH_USD"))
+    d.amount.setText("3")
+    assert d.preview.text() == "Abona USD 3,00 · el saldo queda en USD 5,18"
+    d.amount.setText("9")
+    assert "es más que la deuda" in d.preview.text()
+    d.amount.setText("3")
+    d._save()
+    assert d.saved_id is not None
+    assert credit_service.customer_balance(conn, credit_customer.id) == D("5.18")
+
+    st = cw.StatementDialog(conn, owner, credit_customer.id)
+    assert st.debts.rowCount() == 1 and st.payments.rowCount() == 1
+    assert st.payments.item(0, 0).text() == "AB-000001"
+    monkeypatch.setattr(cw.QInputDialog, "getText", lambda *a, **k: ("error", True))
+    st.payments.selectRow(0)
+    st._void()
+    assert st.payments.item(0, 6).text() == "ANULADO"
+    assert credit_service.customer_balance(conn, credit_customer.id) == D("8.18")
+
+
+def test_customer_credit_dialog(app, conn, owner, credit_customer) -> None:
+    from repuestos.services import customer_service
+    from repuestos.ui.credit_window import CustomerCreditDialog
+
+    d = CustomerCreditDialog(conn, owner, credit_customer.id)
+    d.limit.setText("50")
+    d.days.setText("30")
+    d.phone.setText("0414-1112233")
+    d._save()
+    c = customer_service.get(conn, credit_customer.id)
+    assert (c.credit_limit_usd, c.credit_days, c.phone) == (D("50.00"), 30, "0414-1112233")
+
+
+def test_main_window_aviso_de_fiado_vencido(app, conn, owner, open_shop, credit_customer) -> None:
+    from datetime import date, timedelta
+
+    from repuestos.domain.sale import PaymentInput, PaymentMethod
+    from repuestos.services import credit_service, sale_service
+    from repuestos.services.sale_service import CartItem
+
+    credit_service.set_customer_credit(conn, owner, credit_customer.id, True, days=1)
+    past = date.today() - timedelta(days=5)
+    rate_service.set_manual_rate(conn, owner, D("231.0468"), today=past)
+    sale_service.charge(
+        conn,
+        owner,
+        [CartItem(open_shop[0].id, D("1"))],
+        [PaymentInput(PaymentMethod.CASH_VES, D("1"))],
+        D("231.0468"),
+        credit_customer.id,
+        today=past,
+        on_credit=True,
+    )
+    m = MainWindow(conn, owner)
+    m.fetcher.start = lambda: None
+    assert "Fiado vencido: <b>1</b> cliente" in m.alerts.text()
     m.close()

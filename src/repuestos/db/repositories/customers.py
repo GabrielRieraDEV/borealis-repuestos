@@ -6,7 +6,7 @@ import sqlite3
 from dataclasses import dataclass
 from decimal import Decimal
 
-from repuestos.domain.money import from_db
+from repuestos.domain.money import from_db, to_db
 
 FINAL_CONSUMER_ID = 1
 
@@ -64,3 +64,26 @@ def search(conn: sqlite3.Connection, text: str, limit: int = 50) -> list[Custome
 def insert(conn: sqlite3.Connection, name: str, id_doc: str, phone: str) -> int:
     cur = conn.execute("INSERT INTO customers (name, id_doc, phone) VALUES (?, ?, ?)", (name, id_doc, phone))
     return int(cur.lastrowid)  # type: ignore[arg-type]
+
+
+def list_all(conn: sqlite3.Connection, text: str = "", limit: int = 500) -> list[Customer]:
+    like = f"%{text}%"
+    rows = conn.execute(
+        "SELECT * FROM customers WHERE id <> 1 AND (name LIKE ? OR COALESCE(id_doc, '') LIKE ?)"
+        " ORDER BY name COLLATE NOCASE LIMIT ?",
+        (like, like, limit),
+    )
+    return [_to(r) for r in rows]
+
+
+def update_info(conn: sqlite3.Connection, customer_id: int, name: str, phone: str) -> None:
+    conn.execute("UPDATE customers SET name = ?, phone = ? WHERE id = ?", (name, phone, customer_id))
+
+
+def update_credit(
+    conn: sqlite3.Connection, customer_id: int, enabled: bool, limit_usd: Decimal | None, days: int | None
+) -> None:
+    conn.execute(
+        "UPDATE customers SET credit_enabled = ?, credit_limit_usd_e2 = ?, credit_days = ? WHERE id = ?",
+        (int(enabled), to_db(limit_usd, "e2") if limit_usd is not None else None, days, customer_id),
+    )

@@ -14,18 +14,28 @@ from datetime import date
 from decimal import Decimal
 
 from repuestos.db.connection import transaction
+from repuestos.db.repositories import credit as credit_repo
 from repuestos.db.repositories import customers as customers_repo
 from repuestos.db.repositories import products as products_repo
 from repuestos.db.repositories import sales as repo
 from repuestos.db.repositories import sequences
 from repuestos.db.repositories import users as users_repo
 from repuestos.db.repositories.sales import Sale
+from repuestos.domain.credit import due_date, within_limit
 from repuestos.domain.inventory import MovementType
 from repuestos.domain.money import ZERO
-from repuestos.domain.pricing import DocumentTotals, check_quantity, document_totals, line_totals, unit_price_ves
+from repuestos.domain.pricing import (
+    DocumentTotals,
+    check_quantity,
+    credit_debt_usd,
+    document_totals,
+    line_totals,
+    unit_price_ves,
+)
 from repuestos.domain.products import Product
-from repuestos.domain.sale import PaymentInput, PaymentMethod, check_payment, payment_rows
+from repuestos.domain.sale import PaymentInput, PaymentMethod, check_payment, credit_rows, payment_rows
 from repuestos.domain.users import User
+from repuestos.formatting import format_usd
 from repuestos.services import cash_service, rate_service, settings_service
 from repuestos.services.audit_service import audit
 from repuestos.services.stock import apply_movement
@@ -57,6 +67,19 @@ class InsufficientStockError(ValueError):
         )
         super().__init__(f"No hay suficiente existencia. {detail}.")
         self.shortages = shortages
+
+
+class CreditLimitError(ValueError):
+    """RN-07: la deuda nueva supera el límite del cliente. Se puede fiar igual con la clave de la dueña."""
+
+    def __init__(self, customer: str, limit: Decimal, balance: Decimal, new_debt: Decimal) -> None:
+        super().__init__(
+            f"{customer} tiene un límite de fiado de {format_usd(limit)}. Debe {format_usd(balance)} y esta venta "
+            f"agrega {format_usd(new_debt)}."
+        )
+        self.limit = limit
+        self.balance = balance
+        self.new_debt = new_debt
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,8 +173,13 @@ def charge(
     change_usd: Decimal = ZERO,
     authorized_by: int | None = None,
     today: date | None = None,
+    on_credit: bool = False,
 ) -> Sale:
-    """RF-52: cobra la venta. Lanza InsufficientStockError (para pedir la clave de la dueña) o RateChangedError."""
+    """RF-52: cobra la venta. Lanza InsufficientStockError o CreditLimitError (para pedir la clave de la dueña)
+    o RateChangedError.
+
+    ``on_credit``: lo que no se pagó va a fiado (RF-71, RN-07): la deuda se guarda en USD con la tasa de la venta.
+    """
     if not items:
         raise ValueError("La venta no tiene productos.")
     for p in payments:
@@ -168,6 +196,10 @@ def charge(
         customer = customers_repo.get(conn, customer_id)
         if customer is None or not customer.active:
             raise LookupError("El cliente no existe.")
+        if on_credit and (customer.is_final_consumer or not customer.credit_enabled):
+            raise ValueError(
+                "Este cliente no tiene fiado habilitado. Elija un cliente con fiado (la dueña lo habilita en Fiado)."
+            )
 
         products: dict[int, Product] = {}
         requested: dict[int, Decimal] = defaultdict(lambda: ZERO)
@@ -195,7 +227,21 @@ def charge(
 
         t_ves = document_totals([lt.total_ves for *_, lt in lines], vat_bp)
         t_usd = document_totals([lt.total_usd for *_, lt in lines], vat_bp)
-        rows = payment_rows(t_ves.total, payments, rate, change_usd)
+        credit_ves = credit_usd = ZERO
+        over_limit = False
+        if on_credit:
+            if change_usd != 0:
+                raise ValueError("Una venta a fiado no lleva vuelto.")
+            rows, credit_ves = credit_rows(t_ves.total, payments, rate)
+            credit_usd = credit_debt_usd(credit_ves, rate)
+            balance = credit_repo.customer_balance(conn, customer.id)
+            if not within_limit(customer.credit_limit_usd, balance, credit_usd):
+                over_limit = True
+                if not _valid_owner(conn, authorized_by):
+                    assert customer.credit_limit_usd is not None
+                    raise CreditLimitError(customer.name, customer.credit_limit_usd, balance, credit_usd)
+        else:
+            rows = payment_rows(t_ves.total, payments, rate, change_usd)
 
         number = sequences.take_next(conn, "NE")
         sale_id = repo.insert_sale(
@@ -210,8 +256,8 @@ def charge(
             t_ves.vat,
             t_usd.total,
             t_usd.base,
-            ZERO,
-            ZERO,
+            credit_usd,
+            credit_ves,
         )
         for product, qty, price_ves, lt in lines:
             repo.insert_item(
@@ -231,6 +277,24 @@ def charge(
             apply_movement(conn, product.id, MovementType.SALE, -qty, user.id, sale_id=sale_id)
         for row in rows:
             repo.insert_payment(conn, session.id, row, sale_id=sale_id)
+        if on_credit:
+            days = customer.credit_days or settings.default_credit_days
+            credit_repo.insert_receivable(conn, sale_id, customer.id, credit_usd, due_date(today or date.today(), days))
+            if over_limit:
+                audit(
+                    conn,
+                    user.id,
+                    "CREDIT_LIMIT_EXCEEDED",
+                    "sale",
+                    sale_id,
+                    {
+                        "nota": f"NE-{number:06d}",
+                        "cliente": customer.name,
+                        "limite_usd": customer.credit_limit_usd,
+                        "deuda_nueva_usd": credit_usd,
+                    },
+                    authorized_by=authorized_by,
+                )
         if shortages:
             audit(
                 conn,
@@ -271,8 +335,13 @@ def void_sale(
         open_session = cash_service.current_session(conn)
         if open_session is None or open_session.id != sale.session_id:
             raise ValueError("Esa venta es de una caja ya cerrada: no se anula. Corrija con un ajuste de inventario.")
-        if sale.credit_usd > 0:
-            raise ValueError("Esta venta tiene fiado: la anulación de ventas a fiado llega con el módulo de fiado.")
+        receivable = credit_repo.receivable_of_sale(conn, sale_id)
+        if receivable is not None:
+            if credit_repo.active_allocations_count(conn, receivable.id):
+                raise ValueError(
+                    "La deuda de esta venta ya tiene abonos. Anule primero los abonos o corrija con un ajuste."
+                )
+            credit_repo.void_receivable(conn, receivable.id)
         for item in sale.items:
             apply_movement(
                 conn, item.product_id, MovementType.SALE_VOID, item.qty, user.id, sale_id=sale_id, reason=reason

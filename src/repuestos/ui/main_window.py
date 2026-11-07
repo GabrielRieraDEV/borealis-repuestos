@@ -8,12 +8,14 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QGridLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
+from repuestos.domain.money import ZERO
 from repuestos.domain.users import ROLE_LABELS, User
-from repuestos.formatting import format_date, format_rate
-from repuestos.services import cash_service, product_service, rate_service, settings_service
+from repuestos.formatting import format_date, format_rate, format_usd
+from repuestos.services import cash_service, credit_service, product_service, rate_service, settings_service
 from repuestos.services.rate_service import SOURCE_LABELS
 from repuestos.ui.admin_dialogs import CategoriesDialog, SettingsDialog, UsersDialog
 from repuestos.ui.cash_window import CashWindow
+from repuestos.ui.credit_window import CreditWindow
 from repuestos.ui.inventory_window import InventoryWindow
 from repuestos.ui.products_window import ProductsWindow
 from repuestos.ui.purchases_window import PurchasesWindow
@@ -93,7 +95,7 @@ class MainWindow(QMainWindow):
                 self._big_button("Inventario", lambda: self.open_inventory(0)),
             ]
         buttons += [
-            self._big_button("Fiado", enabled=False),
+            self._big_button("Fiado", self.open_credit),
             self._big_button("Reportes", enabled=False),
             self._big_button("Tasa BCV", self.open_rate),
         ]
@@ -169,6 +171,14 @@ class MainWindow(QMainWindow):
             if self.user.is_owner:
                 text += ' <a href="pedir">Ver la lista</a>'
             alerts.append(text)
+        overdue = [d for d in credit_service.debtors(self._conn) if d.overdue_usd > 0]
+        if overdue:
+            total = sum((d.overdue_usd for d in overdue), ZERO)
+            n = len(overdue)
+            alerts.append(
+                f"• Fiado vencido: <b>{n}</b> cliente{'s' if n != 1 else ''} por <b>{format_usd(total)}</b>."
+                ' <a href="fiado">Ver deudores</a>'
+            )
         self.alerts.setText("<br>".join(alerts))
 
     # ------------------------------------------------------------------ acciones
@@ -191,6 +201,10 @@ class MainWindow(QMainWindow):
         CashWindow(self._conn, self.user, self).exec()
         self.refresh_status()
 
+    def open_credit(self) -> None:
+        CreditWindow(self._conn, self.user, self).exec()
+        self.refresh_status()
+
     def open_sales(self) -> None:
         SalesListWindow(self._conn, self.user, self).exec()
         self.refresh_status()
@@ -206,6 +220,8 @@ class MainWindow(QMainWindow):
     def _alert_link(self, link: str) -> None:
         if link == "pedir" and self.user.is_owner:
             self.open_inventory(0)
+        elif link == "fiado":
+            self.open_credit()
 
     def open_rate(self) -> None:
         RateDialog(self._conn, self.user, self.fetcher, self).exec()

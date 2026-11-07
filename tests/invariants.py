@@ -37,11 +37,41 @@ def inv3_paid(conn: sqlite3.Connection) -> list[str]:
     return [f"venta {r['id']}" for r in rows if r["paid"] + r["credit_ves_e2"] != r["total_ves_e2"]]
 
 
+def inv4_receivables(conn: sqlite3.Connection) -> list[str]:
+    rows = conn.execute(
+        """
+        SELECT r.id, r.amount_usd_e2, r.balance_usd_e2, r.status,
+               COALESCE((SELECT SUM(a.amount_usd_e2) FROM credit_allocations a
+                         JOIN credit_payments p ON p.id = a.credit_payment_id
+                         WHERE a.receivable_id = r.id AND p.status = 'COMPLETED'), 0) AS paid
+        FROM receivables r
+        """
+    )
+    out = []
+    for r in rows:
+        if r["balance_usd_e2"] != r["amount_usd_e2"] - r["paid"]:
+            out.append(f"deuda {r['id']}: saldo no cuadra con los abonos")
+        if r["status"] != "VOIDED" and (r["status"] == "PAID") != (r["balance_usd_e2"] == 0):
+            out.append(f"deuda {r['id']}: estado {r['status']} con saldo {r['balance_usd_e2']}")
+    return out
+
+
+def inv5_credit_payments(conn: sqlite3.Connection) -> list[str]:
+    rows = conn.execute(
+        """
+        SELECT p.id, p.amount_usd_e2,
+               COALESCE((SELECT SUM(amount_usd_e2) FROM credit_allocations a WHERE a.credit_payment_id = p.id), 0) AS al
+        FROM credit_payments p
+        """
+    )
+    return [f"abono {r['id']}" for r in rows if r["amount_usd_e2"] != r["al"]]
+
+
 def inv6_cash(conn: sqlite3.Connection) -> list[str]:
     out = []
     if conn.execute("SELECT COUNT(*) FROM cash_sessions WHERE status = 'OPEN'").fetchone()[0] > 1:
         out.append("más de una caja abierta")
-    for table in ("sales", "payments", "cash_movements"):
+    for table in ("sales", "payments", "cash_movements", "credit_payments"):
         bad = conn.execute(
             f"SELECT COUNT(*) FROM {table} t JOIN cash_sessions s ON s.id = t.session_id"
             " WHERE t.created_at < s.opened_at OR (s.closed_at IS NOT NULL AND t.created_at > s.closed_at)"
@@ -56,6 +86,9 @@ def inv7_numbers(conn: sqlite3.Connection) -> list[str]:
     numbers = [r[0] for r in conn.execute("SELECT number FROM sales WHERE doc_type = 'NE' ORDER BY number")]
     if numbers != list(range(1, len(numbers) + 1)):
         out.append(f"notas con huecos: {numbers[:20]}")
+    ab = [r[0] for r in conn.execute("SELECT number FROM credit_payments ORDER BY number")]
+    if ab != list(range(1, len(ab) + 1)):
+        out.append(f"abonos con huecos: {ab[:20]}")
     next_ne = conn.execute("SELECT next_number FROM doc_sequences WHERE doc_type = 'NE'").fetchone()[0]
     if next_ne != len(numbers) + 1:
         out.append(f"correlativo NE en {next_ne} con {len(numbers)} notas")
@@ -85,6 +118,8 @@ def all_violations(conn: sqlite3.Connection) -> list[str]:
         *inv1_stock(conn),
         *inv2_sale_totals(conn),
         *inv3_paid(conn),
+        *inv4_receivables(conn),
+        *inv5_credit_payments(conn),
         *inv6_cash(conn),
         *inv7_numbers(conn),
         *inv8_voided(conn),

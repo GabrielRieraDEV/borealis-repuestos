@@ -129,3 +129,21 @@ def payment_rows(
             rows.append(PaymentRow(PaymentMethod.CASH_VES, Currency.VES, -change.rest_ves, -change.rest_ves, True))
     assert sum((r.amount_ves for r in rows), ZERO) == total_ves
     return rows
+
+
+def credit_rows(total_ves: Decimal, payments: list[PaymentInput], rate: Decimal) -> tuple[list[PaymentRow], Decimal]:
+    """Venta a fiado total o parcial (RN-07): lo pagado no alcanza y el resto va a fiado. Sin vuelto.
+
+    Devuelve las filas de pago y la parte fiada en Bs exacta (credit_ves = total_bs − pagado_bs), de modo que
+    Σ amount_ves + credit_ves = total_ves (invariante 3).
+    """
+    for p in payments:
+        check_payment(p)
+    summary = payment_summary(total_ves, payments, rate)
+    if summary.complete:
+        raise ValueError("La venta ya está pagada completa: no queda nada para fiar.")
+    rows = [
+        PaymentRow(p.method, p.currency, p.amount, ves_equivalent(p.amount, p.currency, rate), False, p.reference)
+        for p in payments
+    ]
+    return rows, total_ves - summary.paid_ves

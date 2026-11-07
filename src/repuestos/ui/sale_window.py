@@ -34,7 +34,7 @@ from PySide6.QtWidgets import (
 
 from repuestos.db.repositories.customers import Customer
 from repuestos.domain.money import ZERO
-from repuestos.domain.pricing import compute_change, ves_equivalent
+from repuestos.domain.pricing import compute_change, credit_debt_usd, ves_equivalent
 from repuestos.domain.products import UNIT_SHORT, Unit
 from repuestos.domain.sale import (
     METHOD_CURRENCY,
@@ -55,7 +55,13 @@ from repuestos.services import (
     sale_service,
     settings_service,
 )
-from repuestos.services.sale_service import CartItem, InsufficientStockError, LineQuote, RateChangedError
+from repuestos.services.sale_service import (
+    CartItem,
+    CreditLimitError,
+    InsufficientStockError,
+    LineQuote,
+    RateChangedError,
+)
 from repuestos.ui.authorize_dialog import ask_owner_authorization
 from repuestos.ui.common import decimal_field_text, format_qty, read_decimal, run_action
 from repuestos.ui.print_helpers import print_with_fallback
@@ -175,13 +181,21 @@ class PaymentDialog(QDialog):
     }
 
     def __init__(
-        self, total_ves: Decimal, total_usd: Decimal, rate: Decimal, usdt_enabled: bool, parent: QWidget | None = None
+        self,
+        total_ves: Decimal,
+        total_usd: Decimal,
+        rate: Decimal,
+        usdt_enabled: bool,
+        parent: QWidget | None = None,
+        credit_customer: str | None = None,
     ) -> None:
         super().__init__(parent)
         self.total_ves = total_ves
         self.rate = rate
         self.payments: list[PaymentInput] = []
         self.change_usd = ZERO
+        self.on_credit = False  # el resto va a fiado (RF-71)
+        self.credit_customer = credit_customer
         self.setWindowTitle("Cobrar")
         self.resize(760, 560)
 
@@ -195,8 +209,13 @@ class PaymentDialog(QDialog):
                 continue
             self.method.addItem(f"{METHOD_LABELS[m]} ({self.KEYS[m]})", m.value)
         credit_index = self.method.findData(PaymentMethod.CREDIT.value)
-        self.method.model().item(credit_index).setEnabled(False)  # Fiado: llega en la Fase 4
-        self.method.setItemData(credit_index, "Disponible con el módulo de fiado", Qt.ItemDataRole.ToolTipRole)
+        if credit_customer is None:
+            self.method.model().item(credit_index).setEnabled(False)
+            self.method.setItemData(
+                credit_index,
+                "El cliente no tiene fiado habilitado. Elija el cliente con F3 en la venta.",
+                Qt.ItemDataRole.ToolTipRole,
+            )
         self.amount = QLineEdit()
         self.amount.setPlaceholderText("Monto (Enter con el campo vacío completa lo que falta)")
         self.reference = QLineEdit()
@@ -260,7 +279,7 @@ class PaymentDialog(QDialog):
         cancel.clicked.connect(self.reject)
         QShortcut(QKeySequence("F9"), self, activated=self._charge)
         for m, key in self.KEYS.items():
-            if self.method.findData(m.value) >= 0 and m is not PaymentMethod.CREDIT:
+            if self.method.findData(m.value) >= 0 and (m is not PaymentMethod.CREDIT or credit_customer):
                 QShortcut(QKeySequence(key), self, activated=lambda m=m: self._select(m))
         delete = QShortcut(QKeySequence(Qt.Key.Key_Delete), self.table, activated=self._remove)
         delete.setContext(Qt.ShortcutContext.WidgetShortcut)
@@ -287,22 +306,34 @@ class PaymentDialog(QDialog):
 
     def _refresh(self) -> None:
         s = self.summary()
-        self.table.setRowCount(len(self.payments))
+        if s.complete:
+            self.on_credit = False
+        self.table.setRowCount(len(self.payments) + (1 if self.on_credit else 0))
         for row, p in enumerate(self.payments):
             amount = format_usd(p.amount) if p.currency.value == "USD" else format_ves(p.amount)
             label = METHOD_LABELS[p.method] + (f" · Ref. {p.reference}" if p.reference else "")
             self.table.setItem(row, 0, _cell(label))
             self.table.setItem(row, 1, _cell(amount, True))
             self.table.setItem(row, 2, _cell(format_ves(ves_equivalent(p.amount, p.currency, self.rate)), True))
+        if self.on_credit:
+            row = len(self.payments)
+            self.table.setItem(row, 0, _cell(f"Fiado a {self.credit_customer} (Supr quita)"))
+            self.table.setItem(row, 1, _cell(format_usd(credit_debt_usd(s.due_ves, self.rate)), True))
+            self.table.setItem(row, 2, _cell(format_ves(s.due_ves), True))
         self.paid_label.setText(f"Pagado: {format_ves(s.paid_ves)}")
-        if s.due_ves > 0:
+        if self.on_credit:
+            self.due_label.setText(
+                f"A fiado: {format_ves(s.due_ves)}  ·  deuda {format_usd(credit_debt_usd(s.due_ves, self.rate))}"
+            )
+            self.due_label.setStyleSheet("font-size: 16pt; font-weight: bold; color: #8a4b00;")
+        elif s.due_ves > 0:
             self.due_label.setText(f"Falta: {format_ves(s.due_ves)}  ·  {format_usd(s.due_usd_ref)}")
             self.due_label.setStyleSheet("font-size: 16pt; font-weight: bold; color: #b00020;")
         else:
             self.due_label.setText("Pago completo")
             self.due_label.setStyleSheet("font-size: 16pt; font-weight: bold; color: #1b5e20;")
         self.change_box.setVisible(s.change_ves > 0)
-        ok = s.complete
+        ok = s.complete or (self.on_credit and s.due_ves > 0)
         if s.change_ves > 0:
             self.change_total.setText(f"Vuelto: {format_ves(s.change_ves)}")
             try:
@@ -322,12 +353,26 @@ class PaymentDialog(QDialog):
         index = self.method.findData(method.value)
         if index < 0:
             return
+        if method is PaymentMethod.CREDIT:
+            self._toggle_credit()
+            return
         self.method.setCurrentIndex(index)
         self.amount.clear()
         self.amount.setFocus()
 
+    def _toggle_credit(self) -> None:
+        """F6: lo que falta va a fiado; otra vez F6 (o Supr sobre el renglón) lo quita."""
+        if self.credit_customer is None or self.summary().complete:
+            return
+        self.on_credit = not self.on_credit
+        self._refresh()
+        (self.charge_button if self.on_credit else self.amount).setFocus()
+
     def _enter(self) -> None:
         method = PaymentMethod(self.method.currentData())
+        if method is PaymentMethod.CREDIT:
+            self._toggle_credit()
+            return
         s = self.summary()
         if not self.amount.text().strip():
             if s.complete:
@@ -358,6 +403,9 @@ class PaymentDialog(QDialog):
 
     def _remove(self) -> None:
         row = self.table.currentRow()
+        if self.on_credit and row == len(self.payments):
+            self._toggle_credit()
+            return
         if 0 <= row < len(self.payments):
             del self.payments[row]
             self._refresh()
@@ -678,7 +726,10 @@ class SaleWindow(QDialog):
             return
         t = sale_service.totals(self.lines)
         usdt = settings_service.load(self._conn).payment_usdt_enabled
-        pay = PaymentDialog(t.ves.total, t.usd.total, self.rate, usdt, self)
+        credit_name = (
+            self.customer.name if self.customer.credit_enabled and not self.customer.is_final_consumer else None
+        )
+        pay = PaymentDialog(t.ves.total, t.usd.total, self.rate, usdt, self, credit_customer=credit_name)
         if pay.exec() != QDialog.DialogCode.Accepted:
             self.search.setFocus()
             return
@@ -695,8 +746,18 @@ class SaleWindow(QDialog):
                     self.customer.id,
                     pay.change_usd,
                     authorized_by,
+                    on_credit=pay.on_credit,
                 )
                 break
+            except CreditLimitError as exc:
+                if (
+                    QMessageBox.question(self, "Límite de fiado", f"{exc}\n\n¿Fiar igual?")
+                    != QMessageBox.StandardButton.Yes
+                ):
+                    return
+                authorized_by = ask_owner_authorization(self._conn, self._user, "fiar por encima del límite", self)
+                if authorized_by is None:
+                    return
             except InsufficientStockError as exc:
                 if (
                     QMessageBox.question(self, "Sin existencia suficiente", f"{exc}\n\n¿Vender igual?")

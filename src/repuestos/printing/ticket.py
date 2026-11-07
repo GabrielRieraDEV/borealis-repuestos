@@ -197,3 +197,52 @@ def close_ticket(d: CloseTicketData, business: BusinessHeader) -> list[str]:
 
 def as_text(lines: list[str]) -> str:
     return "\n".join(lines) + "\n"
+
+
+@dataclass(frozen=True, slots=True)
+class CreditReceiptData:
+    doc_number: str
+    created_at: str
+    cashier: str
+    customer_name: str
+    customer_id_doc: str | None
+    payments: list[tuple[PaymentMethod, str, Decimal, Decimal, str]]  # método, moneda, monto, equiv. Bs, ref.
+    rate: Decimal
+    amount_usd: Decimal
+    applied: list[tuple[str, Decimal]]  # (NE-000001, USD aplicado)
+    balance_after: Decimal
+    voided: bool = False
+
+
+def credit_receipt(d: CreditReceiptData, business: BusinessHeader, reprint: bool = False) -> list[str]:
+    """Comprobante de abono AB-000001 (RF-72)."""
+    out = _header(business)
+    out.append(RULE)
+    out += center("COMPROBANTE DE ABONO")
+    if d.voided:
+        out += center("*** ANULADO ***")
+    elif reprint:
+        out += center("(reimpresión)")
+    out.append(lr(f"Nro: {d.doc_number}", _datetime(d.created_at)))
+    out += wrap(f"Recibió: {d.cashier}")
+    out += wrap(f"Cliente: {d.customer_name}")
+    if d.customer_id_doc:
+        out.append(f"C.I./RIF: {_id_doc(d.customer_id_doc)}")
+    out.append(RULE)
+    for method, currency, amount, amount_ves, ref in d.payments:
+        label = METHOD_LABELS[method] + (f" Ref. {ref}" if ref else "")
+        shown = format_usd(amount) if currency == "USD" else format_ves(amount)
+        out.append(lr(label, shown))
+        if currency == "USD":
+            out.append(lr("  equivale a", format_ves(amount_ves)))
+    out.append(lr("Tasa BCV", format_rate(d.rate)))
+    out.append(lr("ABONO", format_usd(d.amount_usd)))
+    out.append(RULE)
+    out.append("Aplicado a:")
+    for doc, amount in d.applied:
+        out.append(lr(f"  {doc}", format_usd(amount)))
+    out.append(RULE)
+    out.append(lr("SALDO PENDIENTE", format_usd(d.balance_after)))
+    out.append(RULE)
+    out += center("Gracias por su pago")
+    return out

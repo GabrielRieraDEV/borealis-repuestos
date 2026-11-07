@@ -19,7 +19,14 @@ import pytest
 from repuestos.db.connection import connect
 from repuestos.db.migrate import apply_migrations
 from repuestos.domain.products import ProductData
-from repuestos.services import cash_service, product_service, rate_service, setup_service
+from repuestos.services import (
+    cash_service,
+    credit_service,
+    customer_service,
+    product_service,
+    rate_service,
+    setup_service,
+)
 from tests.invariants import all_violations
 
 WORKER = Path(__file__).with_name("powercut_worker.py")
@@ -41,6 +48,8 @@ def _prepare(path: Path) -> None:
             ProductData(name=f"Repuesto {i}", price_usd=D("1.25") * (i + 1), cost_usd=D("0.5")),
             D("1000000"),
         )
+    customer = customer_service.create(conn, owner, "Cliente fiado", "V1234567")
+    credit_service.set_customer_credit(conn, owner, customer.id, True)
     cash_service.open_session(conn, owner, D("100"), D("1000"))
     conn.close()
 
@@ -66,6 +75,8 @@ def test_corte_de_luz_20_veces(tmp_path: Path) -> None:
         time.sleep(rnd.uniform(0.05, 0.6))
         proc.kill()  # corte brusco, sin cerrar la conexión ni terminar la transacción
         proc.wait(timeout=10)
+        errors = proc.stderr.read().decode(errors="replace") if proc.stderr else ""
+        assert "Traceback" not in errors, f"el subproceso falló solo antes del corte: {errors}"
         assert proc.returncode != 0, "el subproceso terminó solo: revise el bucle de ventas"
 
         conn = connect(db)
