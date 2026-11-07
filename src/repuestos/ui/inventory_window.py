@@ -28,11 +28,11 @@ from PySide6.QtWidgets import (
 from repuestos.domain.inventory import ADJUSTMENT_LABELS, AdjustmentKind
 from repuestos.domain.products import UNIT_SHORT, Unit
 from repuestos.domain.users import User
+from repuestos.formatting import format_date, format_usd, parse_decimal
 from repuestos.services import category_service, inventory_service
 from repuestos.services.inventory_service import CountEntry, CountRow
 from repuestos.services.product_service import ProductView
 from repuestos.ui.common import decimal_field_text, format_qty, read_decimal, run_action
-from repuestos.ui.formatting import format_date, format_usd, parse_decimal
 from repuestos.ui.product_picker import resolve_product
 
 POSITIVE = QBrush(QColor("#1b5e20"))

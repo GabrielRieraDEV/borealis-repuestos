@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 from repuestos.domain.users import ROLE_LABELS, User
-from repuestos.services import category_service, settings_service, user_service
+from repuestos.services import category_service, print_service, settings_service, user_service
 from repuestos.ui.common import decimal_field_text, read_decimal, run_action
 
 INACTIVE = QBrush(QColor("#9e9e9e"))
@@ -261,6 +261,14 @@ class SettingsDialog(QDialog):
         self.printer.addItem("")
         self.printer.addItems(QPrinterInfo.availablePrinterNames())
         self.printer.setCurrentText(s.printer_name)
+        test_print = QPushButton("Imprimir prueba")
+        test_print.setAutoDefault(False)
+        test_print.clicked.connect(self._test_print)
+        printer_row = QWidget()
+        prow = QHBoxLayout(printer_row)
+        prow.setContentsMargins(0, 0, 0, 0)
+        prow.addWidget(self.printer, 1)
+        prow.addWidget(test_print)
         self.cloud_dir = QLineEdit(s.cloud_backup_dir)
         browse = QPushButton("Elegir…")
         browse.clicked.connect(self._choose_cloud_dir)
@@ -287,7 +295,7 @@ class SettingsDialog(QDialog):
         form.addRow("", self.usdt)
         form.addRow("IGTF %:", self.igtf)
         form.addRow(QLabel("<b>Equipo</b>"))
-        form.addRow("Impresora de tickets:", self.printer)
+        form.addRow("Impresora de tickets:", printer_row)
         form.addRow("Carpeta de respaldo en la nube:", cloud_row)
         form.addRow("", self.large_font)
 
@@ -299,6 +307,16 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addWidget(buttons)
+
+    def _test_print(self) -> None:
+        try:
+            print_service.print_test(self._conn, self.printer.currentText())
+        except print_service.PrintError as exc:
+            QMessageBox.warning(self, "Impresora", str(exc))
+            return
+        QMessageBox.information(
+            self, "Impresora", "Se envió la página de prueba. Si salió completa, guarde la configuración."
+        )
 
     def _choose_cloud_dir(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Carpeta de respaldo en la nube", self.cloud_dir.text())

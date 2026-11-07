@@ -29,9 +29,14 @@ py -3.12 -m venv .venv
 $env:REPUESTOS_DATA_DIR = "$PWD\dev-data"
 .\.venv\Scripts\python.exe -m repuestos
 
-.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m pytest -q                  # todo (incluye la prueba de corte de luz, ~15 s)
+.\.venv\Scripts\python.exe -m pytest -q -m "not slow"   # sin la prueba de corte de luz
 .\.venv\Scripts\ruff.exe check src tests
 ```
+
+Impresora térmica: Configuración > Impresora de tickets > «Imprimir prueba». Si no hay impresora o no responde, la
+venta queda guardada y el programa ofrece reintentar o guardar el ticket en PDF
+(`C:\ProgramData\BorealisRepuestos\tickets\`).
 
 `REPUESTOS_DATA_DIR` reemplaza la carpeta base `C:\ProgramData\BorealisRepuestos`; dentro se crean `datos\`,
 `respaldos\` y `logs\`.

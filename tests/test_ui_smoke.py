@@ -257,3 +257,201 @@ def test_main_window_buttons_by_role(app, conn: sqlite3.Connection, owner) -> No
     assert not ({"Compras", "Inventario", "Configuración", "Usuarios"} & texts(s))
     m.close()
     s.close()
+
+
+# ------------------------------------------------------------------ Fase 3
+
+
+@pytest.fixture
+def open_shop(conn: sqlite3.Connection, owner):
+    from repuestos.domain.products import ProductData, Unit
+    from repuestos.services import cash_service
+
+    rate_service.set_manual_rate(conn, owner, D("231.0468"))
+    a = product_service.create_product(conn, owner, pastillas(conn, barcode="7591111"), D("10"))
+    b = product_service.create_product(
+        conn,
+        owner,
+        ProductData(name="Cable electrico", unit=Unit.METRO, allows_fraction=True, price_usd=D("0.80")),
+        D("100"),
+    )
+    cash_service.open_session(conn, owner, D("20"), D("500"))
+    return a, b
+
+
+class _FakePayment:
+    """Reemplaza el diálogo de cobro (modal) por pagos fijos."""
+
+    payments: list = []
+    change_usd = D("0")
+
+    def __init__(self, *args, **kwargs) -> None:
+        pass
+
+    def exec(self):
+        return QtWidgets.QDialog.DialogCode.Accepted
+
+
+def test_sale_window_keyboard_flow(app, conn, owner, open_shop, monkeypatch, no_dialogs) -> None:
+    import repuestos.ui.sale_window as sw
+    from repuestos.domain.sale import PaymentInput, PaymentMethod
+
+    a, b = open_shop
+    printed: list = []
+    monkeypatch.setattr(sw, "print_with_fallback", lambda *args: printed.append(args) or True)
+    w = sw.SaleWindow(conn, owner)
+    _show(w)
+    w.qty.setText("2")
+    _type(w.search, "7591111")  # el lector escribe el código y Enter: agrega directo con la cantidad
+    QTest.keyClick(w.search, Qt.Key.Key_Return)
+    assert [(q.code, q.qty) for q in w.lines] == [("R-00001", D("2"))]
+    assert w.search.hasFocus() and w.qty.text() == "1"
+    _type(w.search, "cable")  # una sola coincidencia: pasa a la cantidad
+    QTest.keyClick(w.search, Qt.Key.Key_Return)
+    assert w.qty.hasFocus()
+    w.qty.selectAll()
+    QTest.keyClicks(w.qty, "2,5")
+    QTest.keyClick(w.qty, Qt.Key.Key_Return)
+    assert [q.line_total_ves for q in w.lines] == [D("5780.00"), D("462.50")]
+    assert w.total_label.text() == "TOTAL Bs 6.242,50"
+    QTest.keyClick(w.search, Qt.Key.Key_Delete)  # Supr con la búsqueda vacía quita el renglón elegido
+    assert [q.code for q in w.lines] == ["R-00001"]
+
+    _FakePayment.payments = [PaymentInput(PaymentMethod.CASH_USD, D("30"))]  # Bs 6.931,40
+    _FakePayment.change_usd = D("4")  # vuelto Bs 1.151,40 = 4 USD (924,19) + Bs 227,21
+    monkeypatch.setattr(sw, "PaymentDialog", _FakePayment)
+    QTest.keyClick(w, Qt.Key.Key_F9)
+    assert w.lines == [], no_dialogs
+    assert w.last_label.text().startswith("Última venta NE-000001 · Bs 5.780,00 · vuelto USD 4,00 + Bs 227,21")
+    assert len(printed) == 1
+    assert product_service.get_view(conn, owner, a.id).stock == D("8")
+    assert w.customer.name == "Consumidor final"
+
+
+def test_payment_dialog_criterio_4_con_teclado(app) -> None:
+    from repuestos.domain.sale import PaymentMethod
+    from repuestos.ui.sale_window import PaymentDialog
+
+    d = PaymentDialog(D("2890.00"), D("12.50"), D("231.0468"), usdt_enabled=False)
+    _show(d)
+    assert d.method.findData("USDT") == -1
+    credit = d.method.model().item(d.method.findData("CREDIT"))
+    assert not credit.isEnabled()
+    QTest.keyClick(d, Qt.Key.Key_F2)  # Efectivo USD
+    QTest.keyClicks(d.amount, "15")
+    QTest.keyClick(d.amount, Qt.Key.Key_Return)
+    assert d.change_usd_input.hasFocus() and "Vuelto: Bs 575,70" in d.change_total.text()
+    d.change_usd_input.selectAll()
+    QTest.keyClicks(d.change_usd_input, "2")
+    assert d.change_rest.text().endswith("Bs 113,61")
+    d.change_usd_input.selectAll()
+    QTest.keyClicks(d.change_usd_input, "3")
+    assert not d.charge_button.isEnabled()  # da de más
+    d.change_usd_input.selectAll()
+    QTest.keyClicks(d.change_usd_input, "2")
+    QTest.keyClick(d, Qt.Key.Key_F9)
+    assert d.result() == QtWidgets.QDialog.DialogCode.Accepted
+    assert [(p.method, p.amount) for p in d.payments] == [(PaymentMethod.CASH_USD, D("15"))]
+    assert d.change_usd == D("2")
+
+
+def test_payment_dialog_enter_vacio_completa(app) -> None:
+    from repuestos.ui.sale_window import PaymentDialog
+
+    d = PaymentDialog(D("2890.00"), D("12.50"), D("231.0468"), usdt_enabled=True)
+    _show(d)
+    QTest.keyClick(d, Qt.Key.Key_F3)  # Punto de venta
+    QTest.keyClicks(d.amount, "1000")
+    QTest.keyClick(d.amount, Qt.Key.Key_Return)
+    assert d.due_label.text().startswith("Falta: Bs 1.890,00")
+    QTest.keyClick(d, Qt.Key.Key_F1)
+    QTest.keyClick(d.amount, Qt.Key.Key_Return)  # vacío: completa lo que falta
+    assert d.summary().complete and d.summary().change_ves == 0
+    QTest.keyClick(d.amount, Qt.Key.Key_Return)  # vacío y completo: cobra
+    assert d.result() == QtWidgets.QDialog.DialogCode.Accepted
+
+
+def test_sale_window_sin_existencia_pide_clave(app, conn, owner, open_shop, monkeypatch, no_dialogs) -> None:
+    import repuestos.ui.sale_window as sw
+    from repuestos.domain.sale import PaymentInput, PaymentMethod
+
+    seller = make_seller(conn, owner)
+    monkeypatch.setattr(sw, "print_with_fallback", lambda *args: True)
+    asked: list = []
+    monkeypatch.setattr(sw, "ask_owner_authorization", lambda *args: asked.append(args) or owner.id)
+    _FakePayment.payments = [PaymentInput(PaymentMethod.POS, D("40000"))]
+    _FakePayment.change_usd = D("0")
+    monkeypatch.setattr(sw, "PaymentDialog", _FakePayment)
+    w = sw.SaleWindow(conn, seller)
+    _show(w)
+    w.qty.setText("12")
+    _type(w.search, "7591111")
+    QTest.keyClick(w.search, Qt.Key.Key_Return)
+    assert "clave de la dueña" in w.selected_label.text()
+    w._charge()
+    assert len(asked) == 1 and w.last_label.text().startswith("Última venta NE-000001")
+    assert product_service.get_view(conn, owner, open_shop[0].id).stock == D("-2")
+
+
+def test_cash_window_seller_blind_close(app, conn, owner, monkeypatch, no_dialogs) -> None:
+    import repuestos.ui.cash_window as cw
+    from repuestos.services import cash_service
+
+    seller = make_seller(conn, owner)
+    monkeypatch.setattr(cw, "print_with_fallback", lambda *args: True)
+    w = cw.CashWindow(conn, seller)
+    assert w.tabs.count() == 1  # sin historial para el vendedor
+    w.opening_usd.setText("20")
+    w.opening_ves.setText("500")
+    w._open()
+    assert cash_service.current_session(conn) is not None and w.expected.text() == ""
+    w.mv_amount.setText("100")
+    w.mv_reason.setText("Agua")
+    w._movement()
+    assert w.movements.rowCount() == 1
+
+    class FakeClose:
+        def __init__(self, *a):
+            self.values = (D("20"), D("390"))
+            self.notes = QtWidgets.QLineEdit()
+
+        def exec(self):
+            return QtWidgets.QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(cw, "CloseDialog", FakeClose)
+    w._close()
+    assert no_dialogs[-1] == "Cierre registrado."
+    assert cash_service.current_session(conn) is None
+    owner_window = cw.CashWindow(conn, owner)
+    assert owner_window.history.rowCount() == 1
+    assert owner_window.history.item(0, 8).text() == "Bs -10,00"
+
+
+def test_sales_list_void_by_seller_with_authorization(app, conn, owner, open_shop, monkeypatch) -> None:
+    import repuestos.ui.sales_list as sl
+    from repuestos.domain.sale import PaymentInput, PaymentMethod
+    from repuestos.services import sale_service
+    from repuestos.services.sale_service import CartItem
+
+    seller = make_seller(conn, owner)
+    sale = sale_service.charge(
+        conn, seller, [CartItem(open_shop[0].id, D("1"))], [PaymentInput(PaymentMethod.POS, D("2890"))], D("231.0468")
+    )
+    monkeypatch.setattr(sl.QInputDialog, "getText", lambda *a, **k: ("se equivoco", True))
+    monkeypatch.setattr(sl, "ask_owner_authorization", lambda *a: owner.id)
+    w = sl.SalesListWindow(conn, seller)
+    assert w.table.rowCount() == 1
+    w.table.selectRow(0)
+    w._void()
+    assert sale_service.get_sale(conn, seller, sale.id).voided
+    assert w.table.item(0, 6).text() == "ANULADA"
+
+
+def test_main_window_blocks_sale_without_cash(app, conn, owner, no_dialogs) -> None:
+    rate_service.set_manual_rate(conn, owner, D("231.0468"))
+    m = MainWindow(conn, owner)
+    m.fetcher.start = lambda: None
+    m.open_sale()
+    assert "caja está cerrada" in no_dialogs[-1].lower()
+    assert m.cash_label.text() == "Caja: cerrada"
+    m.close()

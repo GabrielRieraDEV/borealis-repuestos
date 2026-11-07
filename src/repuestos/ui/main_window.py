@@ -9,14 +9,17 @@ from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QGridLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
 from repuestos.domain.users import ROLE_LABELS, User
-from repuestos.services import product_service, rate_service, settings_service
+from repuestos.formatting import format_date, format_rate
+from repuestos.services import cash_service, product_service, rate_service, settings_service
 from repuestos.services.rate_service import SOURCE_LABELS
 from repuestos.ui.admin_dialogs import CategoriesDialog, SettingsDialog, UsersDialog
-from repuestos.ui.formatting import format_date, format_rate
+from repuestos.ui.cash_window import CashWindow
 from repuestos.ui.inventory_window import InventoryWindow
 from repuestos.ui.products_window import ProductsWindow
 from repuestos.ui.purchases_window import PurchasesWindow
 from repuestos.ui.rate import FETCH_INTERVAL_MS, BcvFetcher, RateDialog
+from repuestos.ui.sale_window import SaleWindow
+from repuestos.ui.sales_list import SalesListWindow
 
 NEXT_VERSION = "Disponible en una próxima actualización."
 WARN_STYLE = "background: #fff3cd; color: #664d03; padding: 2px 6px;"
@@ -79,8 +82,10 @@ class MainWindow(QMainWindow):
         owner = self.user.is_owner
         grid = QGridLayout()
         buttons = [
-            self._big_button("Vender", enabled=False),
+            self._big_button("Vender (F5)", self.open_sale),
             self._big_button("Productos (F3)", self.open_products),
+            self._big_button("Caja", self.open_cash),
+            self._big_button("Ventas del día", self.open_sales),
         ]
         if owner:
             buttons += [
@@ -88,7 +93,6 @@ class MainWindow(QMainWindow):
                 self._big_button("Inventario", lambda: self.open_inventory(0)),
             ]
         buttons += [
-            self._big_button("Caja", enabled=False),
             self._big_button("Fiado", enabled=False),
             self._big_button("Reportes", enabled=False),
             self._big_button("Tasa BCV", self.open_rate),
@@ -101,6 +105,10 @@ class MainWindow(QMainWindow):
             ]
         for i, b in enumerate(buttons):
             grid.addWidget(b, i // 4, i % 4)
+        sale_action = QAction(self)
+        sale_action.setShortcut(QKeySequence("F5"))
+        sale_action.triggered.connect(self.open_sale)
+        self.addAction(sale_action)
         products_action = QAction(self)
         products_action.setShortcut(QKeySequence("F3"))
         products_action.triggered.connect(self.open_products)
@@ -147,6 +155,14 @@ class MainWindow(QMainWindow):
             self.rate_label.setStyleSheet(WARN_STYLE if r.stale else "")
             if r.stale:
                 alerts.append("• La tasa tiene más de 3 días. Revise <b>Tasa BCV</b>.")
+        session = cash_service.current_session(self._conn)
+        if session is None:
+            self.cash_label.setText("Caja: cerrada")
+            alerts.append("• La caja está cerrada: ábrala en <b>Caja</b> para vender.")
+        else:
+            self.cash_label.setText(
+                f"Caja: abierta desde {session.opened_at[11:16]} ({format_date(session.opened_at)})"
+            )
         low = product_service.count_low_stock(self._conn)
         if low:
             text = f"• Para pedir: <b>{low}</b> producto{'s' if low != 1 else ''} en el mínimo o por debajo."
@@ -159,6 +175,24 @@ class MainWindow(QMainWindow):
 
     def open_products(self) -> None:
         ProductsWindow(self._conn, self.user, self).exec()
+        self.refresh_status()
+
+    def open_sale(self) -> None:
+        if rate_service.current_rate(self._conn) is None:
+            QMessageBox.warning(self, "Sin tasa", "No hay tasa del día. Cárguela en Tasa BCV.")
+            return
+        if cash_service.current_session(self._conn) is None:
+            QMessageBox.warning(self, "Caja cerrada", cash_service.NO_OPEN_SESSION)
+            return
+        SaleWindow(self._conn, self.user, self).exec()
+        self.refresh_status()
+
+    def open_cash(self) -> None:
+        CashWindow(self._conn, self.user, self).exec()
+        self.refresh_status()
+
+    def open_sales(self) -> None:
+        SalesListWindow(self._conn, self.user, self).exec()
         self.refresh_status()
 
     def open_purchases(self) -> None:

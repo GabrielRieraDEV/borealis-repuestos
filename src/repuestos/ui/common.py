@@ -11,7 +11,7 @@ from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QDialog, QLineEdit, QMessageBox, QWidget
 
 from repuestos.domain.money import hu
-from repuestos.ui.formatting import format_number, parse_decimal
+from repuestos.formatting import format_number, parse_decimal
 
 #: Errores "de negocio": su mensaje ya está escrito para la usuaria.
 USER_ERRORS = (ValueError, PermissionError, LookupError)

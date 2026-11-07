@@ -19,10 +19,10 @@ from PySide6.QtWidgets import (
 )
 
 from repuestos.domain.users import User
+from repuestos.formatting import format_date, format_rate
 from repuestos.services import bcv, rate_service
 from repuestos.services.rate_service import SOURCE_LABELS
 from repuestos.ui.common import read_decimal, run_action
-from repuestos.ui.formatting import format_date, format_rate
 
 log = logging.getLogger(__name__)
 

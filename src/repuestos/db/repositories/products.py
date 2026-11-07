@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from decimal import Decimal
 
+from repuestos.db.repositories.sequences import take_next
 from repuestos.domain.money import from_db, to_db
 from repuestos.domain.products import Product, ProductData, Unit
 
@@ -27,6 +28,7 @@ def _to_product(r: sqlite3.Row) -> Product:
         price_usd=from_db(r["price_usd_e4"], "e4"),
         cost_usd=from_db(r["cost_usd_e4"], "e4"),
         min_stock=from_db(r["min_stock_e3"], "e3"),
+        vat_rate_bp=r["vat_rate_bp"],
     )
     return Product(
         id=r["id"],
@@ -40,10 +42,7 @@ def _to_product(r: sqlite3.Row) -> Product:
 
 def next_code(conn: sqlite3.Connection) -> str:
     """Código propio R-00001 desde doc_sequences('R'), dentro de la transacción del alta (sin saltos)."""
-    row = conn.execute(
-        "UPDATE doc_sequences SET next_number = next_number + 1 WHERE doc_type = 'R' RETURNING next_number - 1"
-    ).fetchone()
-    return f"R-{row[0]:05d}"
+    return f"R-{take_next(conn, 'R'):05d}"
 
 
 def _data_params(data: ProductData, search_text: str) -> dict[str, object]:
@@ -59,6 +58,7 @@ def _data_params(data: ProductData, search_text: str) -> dict[str, object]:
         "cost_usd_e4": to_db(data.cost_usd, "e4"),
         "price_usd_e4": to_db(data.price_usd, "e4"),
         "min_stock_e3": to_db(data.min_stock, "e3"),
+        "vat_rate_bp": data.vat_rate_bp,
         "search_text": search_text,
     }
 

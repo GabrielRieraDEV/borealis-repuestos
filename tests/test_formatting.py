@@ -3,7 +3,7 @@ from decimal import Decimal as D
 
 import pytest
 
-from repuestos.ui.formatting import format_date, format_rate, format_usd, format_ves, parse_decimal
+from repuestos.formatting import format_date, format_rate, format_usd, format_ves, parse_decimal
 
 
 def test_format_amounts() -> None:

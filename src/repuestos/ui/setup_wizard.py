@@ -20,8 +20,8 @@ from PySide6.QtWidgets import (
 )
 
 from repuestos.domain.users import User
+from repuestos.formatting import parse_decimal
 from repuestos.services import setup_service
-from repuestos.ui.formatting import parse_decimal
 
 
 def _page(title: str, subtitle: str) -> tuple[QWizardPage, QFormLayout]:

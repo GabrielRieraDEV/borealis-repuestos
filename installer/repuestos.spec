@@ -12,8 +12,9 @@ ICON = str(ROOT / "src" / "repuestos" / "ui" / "repuestos.ico")
 a = Analysis(  # noqa: F821
     [str(ROOT / "installer" / "launcher.py")],
     pathex=[str(ROOT / "src")],
-    datas=collect_data_files("repuestos"),  # migraciones .sql e icono
-    hiddenimports=["truststore"],
+    # migraciones .sql e icono; capabilities.json de python-escpos (sin él no imprime)
+    datas=collect_data_files("repuestos") + collect_data_files("escpos"),
+    hiddenimports=["truststore", "win32print", "escpos.printer.win32raw"],
     excludes=["tkinter", "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.Qt3DCore", "pytest"],
     noarchive=False,
 )

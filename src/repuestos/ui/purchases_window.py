@@ -33,11 +33,11 @@ from repuestos.domain.money import ZERO
 from repuestos.domain.pricing import pack_purchase, purchase_line_total
 from repuestos.domain.products import UNIT_SHORT, Unit
 from repuestos.domain.users import User
+from repuestos.formatting import format_date, format_usd
 from repuestos.services import purchase_service
 from repuestos.services.product_service import ProductView
 from repuestos.services.purchase_service import PurchaseLineInput
 from repuestos.ui.common import decimal_field_text, format_qty, read_decimal, run_action
-from repuestos.ui.formatting import format_date, format_usd
 from repuestos.ui.product_dialog import money_text
 from repuestos.ui.product_picker import resolve_product
 

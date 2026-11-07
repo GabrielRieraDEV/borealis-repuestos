@@ -53,6 +53,7 @@ class ProductData:
     price_usd: Decimal = Decimal("0")
     cost_usd: Decimal = Decimal("0")
     min_stock: Decimal = Decimal("10")
+    vat_rate_bp: int = 1600  # RN-02: todos llevan IVA 16 %; el campo existe por producto para el futuro
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,4 +109,5 @@ def clean_product_data(data: ProductData) -> ProductData:
         price_usd=hu(data.price_usd, 4),
         cost_usd=hu(data.cost_usd, 4),
         min_stock=hu(data.min_stock, 3),
+        vat_rate_bp=data.vat_rate_bp,
     )

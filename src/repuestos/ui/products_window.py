@@ -23,10 +23,10 @@ from PySide6.QtWidgets import (
 
 from repuestos.domain.products import UNIT_SHORT, Unit
 from repuestos.domain.users import User
+from repuestos.formatting import format_usd, format_ves
 from repuestos.services import product_service
 from repuestos.services.product_service import ProductView
 from repuestos.ui.common import format_qty, run_action
-from repuestos.ui.formatting import format_usd, format_ves
 from repuestos.ui.product_dialog import ProductDialog
 
 LOW_STOCK_BG = QColor("#ffe0e0")

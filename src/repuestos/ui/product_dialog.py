@@ -33,9 +33,9 @@ from repuestos.domain.money import hu
 from repuestos.domain.pricing import unit_price_ves
 from repuestos.domain.products import UNIT_LABELS, UNIT_SHORT, Product, ProductData, Unit
 from repuestos.domain.users import User
+from repuestos.formatting import format_date, format_number, format_usd, format_ves, parse_decimal
 from repuestos.services import category_service, inventory_service, product_service, rate_service, settings_service
 from repuestos.ui.common import EnterMovesFocusDialog, format_qty, read_decimal, run_action
-from repuestos.ui.formatting import format_date, format_number, format_usd, format_ves, parse_decimal
 
 FRACTION_UNITS = {Unit.METRO, Unit.LITRO}
 
