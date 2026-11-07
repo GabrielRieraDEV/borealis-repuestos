@@ -29,7 +29,7 @@ from repuestos.domain.inventory import ADJUSTMENT_LABELS, AdjustmentKind
 from repuestos.domain.products import UNIT_SHORT, Unit
 from repuestos.domain.users import User
 from repuestos.formatting import format_date, format_usd, parse_decimal
-from repuestos.services import category_service, inventory_service
+from repuestos.services import category_service, inventory_service, print_service
 from repuestos.services.inventory_service import CountEntry, CountRow
 from repuestos.services.product_service import ProductView
 from repuestos.ui.common import decimal_field_text, format_qty, read_decimal, run_action
@@ -71,10 +71,17 @@ class ToOrderTab(QWidget):
         self.summary = QLabel()
         refresh = QPushButton("Actualizar")
         refresh.clicked.connect(self.refresh)
+        ticket = QPushButton("Imprimir en ticket")
+        ticket.clicked.connect(self._print_ticket)
+        pdf = QPushButton("Ver PDF para imprimir")
+        pdf.clicked.connect(self._pdf)
+        for b in (refresh, ticket, pdf):
+            b.setAutoDefault(False)
         bottom = QHBoxLayout()
         bottom.addWidget(self.summary, 1)
-        bottom.addWidget(QLabel("La versión para imprimir (PDF) llega con los reportes."))
         bottom.addWidget(refresh)
+        bottom.addWidget(ticket)
+        bottom.addWidget(pdf)
         layout = QVBoxLayout(self)
         layout.addWidget(self.table, 1)
         layout.addLayout(bottom)
@@ -108,6 +115,17 @@ class ToOrderTab(QWidget):
         self.table.resizeColumnsToContents()
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.summary.setText(f"{len(rows)} producto{'s' if len(rows) != 1 else ''} para pedir")
+
+    def _print_ticket(self) -> None:
+        try:
+            print_service.print_to_order(self._conn, self._user)
+        except print_service.PrintError as exc:
+            QMessageBox.warning(self, "Impresora", str(exc))
+
+    def _pdf(self) -> None:
+        from repuestos.ui.reports_window import show_pdf
+
+        show_pdf(self, lambda: print_service.to_order_pdf(self._conn, self._user))
 
 
 # ------------------------------------------------------------------ ajuste

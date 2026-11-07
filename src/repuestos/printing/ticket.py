@@ -246,3 +246,26 @@ def credit_receipt(d: CreditReceiptData, business: BusinessHeader, reprint: bool
     out.append(RULE)
     out += center("Gracias por su pago")
     return out
+
+
+def to_order_ticket(lines: list, business: BusinessHeader, printed_at: str) -> list[str]:
+    """Lista "Para pedir" en ticket (RF-43): por categoría, con existencia/mínimo y el último proveedor."""
+    from repuestos.domain.products import UNIT_SHORT, Unit
+
+    out = _header(business)
+    out.append(RULE)
+    out += center("PARA PEDIR")
+    out.append(lr(f"{len(lines)} productos", _datetime(printed_at)))
+    previous = None
+    for line in lines:
+        category = line.category_name or "(sin categoría)"
+        if category != previous:
+            out.append(RULE)
+            out.append(clean(category.upper()))
+            previous = category
+        unit = UNIT_SHORT[Unit(line.unit)]
+        out += wrap(f"{line.code} {line.name}", "  ")
+        stock = f"hay {_qty(line.stock)} {unit} / mín. {_qty(line.min_stock)}"
+        out.append(lr(f"  {stock}", line.last_supplier[:20] if line.last_supplier else ""))
+    out.append(RULE)
+    return out

@@ -233,6 +233,8 @@ class PaymentDialog(QDialog):
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for col in (1, 2):  # montos completos aunque la letra sea grande
+            self.table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
 
         self.paid_label = QLabel()
         self.due_label = QLabel()

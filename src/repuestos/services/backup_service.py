@@ -67,7 +67,10 @@ def run_backup(paths: Paths, now: datetime | None = None, with_pdfs: bool = Fals
                     settings_repo.set_value(conn, "last_cloud_backup_at", now.strftime(TIME_FMT))
             except (OSError, files.BackupError) as exc:
                 log.warning("No se pudo copiar el respaldo a la nube (%s): %s", folder, exc)
-                cloud_error = f"No se pudo copiar a la carpeta de la nube: {exc}"
+                cloud_error = (
+                    "No se pudo copiar el respaldo a la carpeta de la nube. "
+                    "Revise que Google Drive esté abierto y que la carpeta exista (Configuración)."
+                )
             if with_pdfs:
                 try:
                     from repuestos.services import print_service

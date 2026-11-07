@@ -42,9 +42,9 @@ class _Worker(QObject):
     def run(self) -> None:
         try:
             self.done.emit(backup_service.run_backup(get_paths(), with_pdfs=self._with_pdfs))
-        except Exception as exc:  # nunca tumba el programa; queda en el log y en la barra de estado
+        except Exception:  # nunca tumba el programa; el detalle queda en el log
             log.exception("Falló el respaldo")
-            self.failed.emit(str(exc))
+            self.failed.emit("No se pudo hacer el respaldo. Intente de nuevo; si se repite, avise a Borealis.")
 
 
 class BackupManager(QObject):

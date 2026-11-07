@@ -226,3 +226,17 @@ def cloud_pdfs(conn: sqlite3.Connection, folder: Path) -> list[Path]:
             folder / CLOUD_SUMMARY_PDF, header, report_service.system_month_summary(conn, today.year, today.month)
         ),
     ]
+
+
+def to_order_lines(conn: sqlite3.Connection, user: User) -> list[str]:
+    from datetime import datetime
+
+    from repuestos.printing.ticket import to_order_ticket
+    from repuestos.services import report_service
+
+    lines = report_service.to_order(conn, user)
+    return to_order_ticket(lines, business_header(conn), datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+
+def print_to_order(conn: sqlite3.Connection, user: User) -> None:
+    printer.send_to_printer(settings_service.load(conn).printer_name, to_order_lines(conn, user))

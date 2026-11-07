@@ -42,9 +42,13 @@ def print_with_fallback(parent: QWidget | None, do_print: Callable[[], None], sa
 def save_and_open_pdf(parent: QWidget | None, save_pdf: Callable[[], Path]) -> bool:
     try:
         path = save_pdf()
-    except OSError as exc:
+    except OSError:
         log.exception("No se pudo guardar el PDF")
-        QMessageBox.warning(parent, "PDF", f"No se pudo guardar el PDF: {exc}")
+        QMessageBox.warning(
+            parent,
+            "PDF",
+            "No se pudo guardar el PDF. Cierre el PDF si está abierto en otro programa e intente de nuevo.",
+        )
         return False
     try:
         os.startfile(path)  # type: ignore[attr-defined]  # abre el visor de PDF de Windows

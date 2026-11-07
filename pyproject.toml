@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "repuestos"
-version = "0.1.0"
+version = "1.0.0"
 description = "Inventario, ventas y caja · Romero Alfa 1 (Borealis Software Solutions)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -31,7 +31,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "repuestos.db.migrations" = ["*.sql"]
-"repuestos.ui" = ["*.ico"]
+"repuestos.ui" = ["*.ico", "*.pdf"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

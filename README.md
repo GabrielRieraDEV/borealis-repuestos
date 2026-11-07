@@ -3,6 +3,17 @@
 Sistema de inventario, ventas y caja para PARTES Y ACCESORIO DE MOTO ROMERO ALFA 1, F.P. (Ciudad Bolívar).
 Desarrollado por Borealis Software Solutions. Opción contratada: Básica.
 
+**Estado: versión 1.0.0, fases 0 a 6 terminadas.** Falta lo que solo se puede hacer en el local: instalar, probar
+la impresora, el lector y Google Drive, y recorrer los 12 criterios con la dueña (`docs/lista-de-pruebas-en-sitio.md`).
+
+## Para la entrega
+
+- `installer\Output\BorealisRepuestos-1.0.0-instalador.exe` — instalador final (se genera con `installer\build.ps1`).
+- `docs/guia-rapida.pdf` — guía de una página para imprimir (también en el programa: Ayuda → Guía rápida, F1).
+  Se genera con `python installer\make_guide.py`; el contenido se edita ahí.
+- `docs/lista-de-pruebas-en-sitio.md` — instalación, equipo, los 12 criterios del PRD y el acta de entrega.
+- `docs/revision-final.md` — cada RF, RN y RNF con el archivo y la prueba que lo demuestran.
+
 ## Cómo arrancar con Claude Code
 
 1. Crea el repositorio privado `borealis-repuestos` en GitHub y copia esta carpeta tal cual.

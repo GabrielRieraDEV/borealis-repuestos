@@ -107,9 +107,14 @@ def _restore_and_restart(conn, paths, user, backup) -> int:
     conn.close()
     try:
         previous = backup_service.restore(paths, user, backup)
-    except Exception as exc:
+    except Exception:
         log.exception("No se pudo restaurar %s", backup)
-        QMessageBox.critical(None, APP_NAME, f"No se pudo restaurar el respaldo. Los datos no cambiaron.\n\n{exc}")
+        QMessageBox.critical(
+            None,
+            APP_NAME,
+            "No se pudo restaurar el respaldo. Si los datos actuales no abren, avise a Borealis: "
+            "la copia previa quedó guardada en la carpeta de respaldos.",
+        )
         return 1
     QMessageBox.information(
         None,

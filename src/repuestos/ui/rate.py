@@ -181,8 +181,7 @@ class RateDialog(QDialog):
             self.message.setText(message)
         else:
             self.message.setText(
-                "No se pudo descargar la tasa del BCV (sin internet o la página no responde). "
-                "Puede cargarla a mano." + (f"\nDetalle: {message}" if message else "")
+                "No se pudo descargar la tasa del BCV (sin internet o la página no responde). Puede cargarla a mano."
             )
         self.refresh()
 

@@ -176,7 +176,7 @@ def test_usdt_solo_si_esta_activo(conn, owner, shop) -> None:
     assert sale.payments[0].amount_ves == D("3003.61")
 
 
-def test_fiado_no_disponible_en_esta_fase(conn, owner, shop) -> None:
+def test_fiado_no_es_una_forma_de_pago(conn, owner, shop) -> None:
     with pytest.raises(ValueError, match="fiado"):
         sell(conn, owner, (shop["a"].id, "1"), pays=[P(M.CREDIT, D("13"))])
 

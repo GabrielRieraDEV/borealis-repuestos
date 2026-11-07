@@ -153,3 +153,15 @@ def test_pdfs_de_reportes(conn, owner, month_case, tmp_path) -> None:
     assert print_service.daily_sales_pdf(conn, seller, TODAY, tmp_path).exists()
     with pytest.raises(PermissionError):
         print_service.valued_inventory_pdf(conn, seller, tmp_path)
+
+
+def test_para_pedir_en_ticket(conn, owner, month_case) -> None:
+    from repuestos.services import print_service
+
+    product_service.create_product(conn, owner, ProductData(name="Bujía NGK", min_stock=D("10")), D("2"))
+    lines = print_service.to_order_lines(conn, owner)
+    text = "\n".join(lines)
+    assert all(len(line) <= 48 for line in lines)
+    assert "PARA PEDIR" in text and "Bujía NGK" in text and "hay 2 u / mín. 10" in text
+    with pytest.raises(print_service.PrintError):
+        print_service.print_to_order(conn, owner)  # sin impresora configurada

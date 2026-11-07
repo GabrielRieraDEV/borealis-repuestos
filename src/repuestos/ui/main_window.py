@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
+from importlib import resources
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QGridLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
+from repuestos import __version__
+from repuestos.config import get_paths
 from repuestos.domain.money import ZERO
 from repuestos.domain.users import ROLE_LABELS, User
 from repuestos.formatting import format_date, format_rate, format_usd
@@ -87,6 +91,14 @@ class MainWindow(QMainWindow):
         leave.triggered.connect(self.close)
         menu.addAction(logout)
         menu.addAction(leave)
+        help_menu = self.menuBar().addMenu("A&yuda")
+        guide = QAction("Guía rápida", self)
+        guide.setShortcut(QKeySequence("F1"))
+        guide.triggered.connect(self.open_guide)
+        about = QAction("Acerca del programa", self)
+        about.triggered.connect(self.open_about)
+        help_menu.addAction(guide)
+        help_menu.addAction(about)
 
     def _big_button(self, text: str, slot=None, enabled: bool = True) -> QPushButton:
         b = QPushButton(text)
@@ -302,6 +314,23 @@ class MainWindow(QMainWindow):
     def open_settings(self) -> None:
         SettingsDialog(self._conn, self.user, self).exec()
         self.refresh_status()
+
+    def open_guide(self) -> None:
+        path = resources.files("repuestos.ui") / "guia-rapida.pdf"
+        try:
+            os.startfile(str(path))  # type: ignore[attr-defined]
+        except (AttributeError, OSError):
+            QMessageBox.information(self, "Guía rápida", f"La guía está en:\n{path}")
+
+    def open_about(self) -> None:
+        QMessageBox.about(
+            self,
+            "Acerca del programa",
+            f"<b>Borealis Repuestos</b> versión {__version__}<br>"
+            "Inventario, ventas y caja para Romero Alfa 1.<br><br>"
+            "Hecho por Borealis Software Solutions. Sin licencia que caduque: el programa es suyo.<br>"
+            f"Datos en {get_paths().base}",
+        )
 
     def show_stock_mismatch(self, count: int) -> None:
         QMessageBox.warning(
