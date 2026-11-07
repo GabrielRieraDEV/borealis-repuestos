@@ -88,6 +88,13 @@ Teclas útiles: **F5** vender · **F9** cobrar · **F2** efectivo USD · **F3** 
   **Restaurar el elegido…** → Sí → escribe **RESTAURAR**. El programa se cierra y **se abre solo**, todavía en
   modo de prueba, con los datos de ese momento. (La copia en Google Drive ya se probó en la guía, paso 8.)
 
+## Extra · Recuperar la clave de la dueña (práctica)
+
+- [ ] Al crear la dueña de práctica salió un código de recuperación: anótalo en una hoja aparte (es solo de prueba).
+  Sesión → Cerrar sesión → **«¿Olvidó la clave de la dueña?»** → escribe ese código y la clave nueva `prueba456`
+  dos veces → Cambiar la clave. Debe decir «Listo» y mostrar un **código nuevo**. Entra como `prueba` con
+  `prueba456`: funciona. Enséñale a la dueña este procedimiento.
+
 ## Resultado
 
 Criterios cumplidos: ____ de 12. Lo que no coincidió (criterio, qué se esperaba, qué se vio):

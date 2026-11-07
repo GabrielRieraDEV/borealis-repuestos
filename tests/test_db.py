@@ -23,18 +23,18 @@ def test_pragmas(conn: sqlite3.Connection) -> None:
 
 
 def test_migrations_applied_once(conn: sqlite3.Connection) -> None:
-    assert applied_versions(conn) == {1}
+    assert applied_versions(conn) == {1, 2}
     assert apply_migrations(conn) == []
     assert conn.execute("SELECT COUNT(*) FROM categories").fetchone()[0] == 10
     assert conn.execute("SELECT next_number FROM doc_sequences WHERE doc_type = 'R'").fetchone()[0] == 1
 
 
 def test_failed_migration_rolls_back_and_is_not_recorded(conn: sqlite3.Connection) -> None:
-    bad = Migration(2, "0002_mala.sql", "CREATE TABLE t_ok (x INTEGER);\nINSERT INTO tabla_que_no_existe VALUES (1);")
+    bad = Migration(99, "0099_mala.sql", "CREATE TABLE t_ok (x INTEGER);\nINSERT INTO tabla_que_no_existe VALUES (1);")
     with pytest.raises(sqlite3.OperationalError):
         apply_migrations(conn, [*load_migrations(), bad])
     assert not conn.in_transaction
-    assert applied_versions(conn) == {1}
+    assert applied_versions(conn) == {1, 2}
     assert conn.execute("SELECT 1 FROM sqlite_master WHERE name = 't_ok'").fetchone() is None
 
 

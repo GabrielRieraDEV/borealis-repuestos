@@ -56,7 +56,13 @@ Abre **«Borealis Repuestos»** (el normal). Si ya tenía la preliminar, este pa
 - [ ] Datos del negocio: razón social y RIF ya vienen escritos; revisa con ella el **domicilio fiscal** y el
       **teléfono** (salen en cada nota de entrega).
 - [ ] Múltiplo de redondeo: **5,00**. Impresora y carpeta de la nube: déjalas en blanco por ahora → Terminar.
+- [ ] Sale el **código de recuperación** (tipo `K7QM-3XR9-PW2H`) en un recuadro amarillo. Es lo único que le permite
+      recuperar su clave si la olvida, y **no se vuelve a mostrar**. Que **la dueña** lo copie en un papel, letra por
+      letra; revisen juntos que esté igual. Que lo guarde en casa o en un sobre, **no pegado en la PC**. **No le tomes
+      foto ni lo anotes tú.** Ella marca «Ya lo anoté en papel» → Continuar.
 - [ ] Debe pasar: pide usuario y contraseña; la dueña entra y ve «Hola, Yoleida…».
+- [ ] **Si ya tenía la versión preliminar:** en la pantalla principal sale el aviso «Falta el código de recuperación».
+      Usuarios → **Código de recuperación…** → Sí → mismo procedimiento del papel.
 
 ## 5. Impresora térmica (20 min)
 

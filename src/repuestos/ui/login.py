@@ -11,12 +11,14 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
     QVBoxLayout,
 )
 
 from repuestos.domain.users import User
 from repuestos.services import auth_service
 from repuestos.ui.brand import brand_label, test_mode_banner
+from repuestos.ui.recovery_ui import RecoverPasswordDialog
 
 
 class LoginDialog(QDialog):
@@ -53,9 +55,22 @@ class LoginDialog(QDialog):
         layout.addWidget(title)
         layout.addLayout(form)
         layout.addWidget(self._error)
+        forgot = QPushButton("¿Olvidó la clave de la dueña?")
+        forgot.setFlat(True)
+        forgot.setAutoDefault(False)
+        forgot.setStyleSheet("color: #1565c0; text-align: left;")
+        forgot.clicked.connect(self._forgot)
+        layout.addWidget(forgot, 0, Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(buttons)
         layout.addWidget(brand_label(), 0, Qt.AlignmentFlag.AlignRight)
         self._username.setFocus()
+
+    def _forgot(self) -> None:
+        dialog = RecoverPasswordDialog(self._conn, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.recovered_username:
+            self._username.setText(dialog.recovered_username)
+            self._error.setText("")
+            self._password.setFocus()
 
     def _try_login(self) -> None:
         try:

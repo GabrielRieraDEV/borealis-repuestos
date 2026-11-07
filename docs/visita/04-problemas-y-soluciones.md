@@ -55,8 +55,13 @@ Es a propósito: sin tasa o sin caja abierta no se puede vender. Cargar la tasa 
 
 ## P8 · La dueña olvidó su contraseña
 
-**No se puede recuperar desde el programa.** No reinstales ni borres nada. Avisa a Gabriel. (Para el vendedor sí:
-la dueña entra y en Usuarios → Restablecer contraseña.)
+1. En la pantalla de entrada: **«¿Olvidó la clave de la dueña?»** → escribe el **código de recuperación** del papel
+   (con o sin guiones, mayúsculas o minúsculas da igual) y la clave nueva dos veces → Cambiar la clave. Sale un
+   código nuevo: que lo anote y bote el papel viejo (el código usado ya no sirve).
+2. Si **perdió el papel**: no reinstales ni borres nada. Avisa a Gabriel: tiene una herramienta de soporte.
+3. Si **conoce su clave pero perdió el papel**: entra y en Usuarios → Código de recuperación… saca uno nuevo.
+
+Para el **vendedor** es más fácil: la dueña entra y en Usuarios → Restablecer contraseña.
 
 ## P9 · Usuario bloqueado
 

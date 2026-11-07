@@ -80,6 +80,10 @@ ACTION_LABELS = {
     "CREDIT_LIMIT_EXCEEDED": "Fiado por encima del límite",
     "CREDIT_PAYMENT_VOID": "Abono anulado",
     "BACKUP_RESTORED": "Respaldo restaurado",
+    "RECOVERY_CODE_CREATED": "Código de recuperación generado",
+    "RECOVERY_FAILED": "Código de recuperación incorrecto",
+    "OWNER_PASSWORD_RECOVERED": "Clave de la dueña recuperada con su código",
+    "OWNER_PASSWORD_RESET_SUPPORT": "Clave de la dueña restablecida por soporte",
 }
 
 

@@ -22,7 +22,8 @@ from PySide6.QtWidgets import (
 from repuestos.config import BRAND
 from repuestos.domain.users import User
 from repuestos.formatting import parse_decimal
-from repuestos.services import setup_service
+from repuestos.services import recovery_service, setup_service
+from repuestos.ui.recovery_ui import RecoveryCodeDialog
 
 
 def _page(title: str, subtitle: str) -> tuple[QWizardPage, QFormLayout]:
@@ -120,7 +121,9 @@ class SetupWizard(QWizard):
                 cloud_backup_dir=self.cloud_dir.text(),
             )
             self.user = setup_service.complete_setup(self._conn, data)
+            code = recovery_service.generate_code(self._conn, self.user)
         except ValueError as exc:
             QMessageBox.warning(self, "Revise los datos", str(exc))
             return
+        RecoveryCodeDialog(code, self).exec()  # se muestra una sola vez
         super().accept()

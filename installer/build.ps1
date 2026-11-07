@@ -30,3 +30,18 @@ if (-not $iscc) { throw "No se encontró Inno Setup 6 (ISCC.exe). Instálelo: wi
 & $iscc "/DAppVersion=$version" "/DChannel=$Channel" installer\repuestos.iss
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup falló." }
 Get-ChildItem installer\Output\*.exe | Select-Object Name, Length, LastWriteTime
+
+# Paquete de entrega para la visita (instalador + documentos + LÉEME), solo en la versión final
+if (-not $Channel) {
+    & $py installer\make_guide.py | Out-Null
+    & $py installer\make_visit_docs.py | Out-Null
+    $pkg = "installer\Output\Visita-Romero-Alfa-1-v$version"
+    Remove-Item -Recurse -Force $pkg -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force "$pkg\visita" | Out-Null
+    Copy-Item "installer\Output\BorealisRepuestos-$version-instalador.exe" $pkg
+    Copy-Item "docs\guia-rapida.pdf", "docs\visita\carpeta-de-la-visita.pdf" $pkg
+    Copy-Item "docs\visita\0*.pdf" "$pkg\visita"
+    Copy-Item "installer\LEEME-visita.txt" "$pkg\LEEME.txt"
+    Compress-Archive -Path "$pkg\*" -DestinationPath "$pkg.zip" -Force
+    Get-Item "$pkg.zip" | Select-Object Name, Length
+}

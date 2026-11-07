@@ -31,8 +31,9 @@ from PySide6.QtWidgets import (
 )
 
 from repuestos.domain.users import ROLE_LABELS, User
-from repuestos.services import category_service, print_service, settings_service, user_service
+from repuestos.services import category_service, print_service, recovery_service, settings_service, user_service
 from repuestos.ui.common import decimal_field_text, read_decimal, run_action
+from repuestos.ui.recovery_ui import RecoveryCodeDialog
 
 INACTIVE = QBrush(QColor("#9e9e9e"))
 
@@ -163,12 +164,14 @@ class UsersDialog(QDialog):
         reset = QPushButton("Restablecer contraseña")
         toggle = QPushButton("Desactivar / activar")
         close = QPushButton("Cerrar")
+        recovery = QPushButton("Código de recuperación…")
+        recovery.clicked.connect(self._recovery_code)
         new.clicked.connect(self._new)
         reset.clicked.connect(self._reset)
         toggle.clicked.connect(self._toggle)
         close.clicked.connect(self.accept)
         buttons = QHBoxLayout()
-        for b in (new, reset, toggle):
+        for b in (new, reset, toggle, recovery):
             buttons.addWidget(b)
         buttons.addStretch(1)
         buttons.addWidget(close)
@@ -225,6 +228,21 @@ class UsersDialog(QDialog):
             return
         run_action(self, lambda: user_service.set_active(self._conn, self._user, u.id, not u.active))
         self.refresh()
+
+    def _recovery_code(self) -> None:
+        if (
+            QMessageBox.question(
+                self,
+                "Código de recuperación",
+                "Se creará un código nuevo para recuperar SU clave si la olvida. El código anterior dejará de servir."
+                " ¿Continuar?",
+            )
+            != QMessageBox.StandardButton.Yes
+        ):
+            return
+        code = run_action(self, lambda: recovery_service.generate_code(self._conn, self._user))
+        if code is not None:
+            RecoveryCodeDialog(code, self).exec()
 
 
 # ------------------------------------------------------------------ configuración

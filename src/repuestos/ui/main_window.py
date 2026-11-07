@@ -21,6 +21,7 @@ from repuestos.services import (
     credit_service,
     product_service,
     rate_service,
+    recovery_service,
     settings_service,
 )
 from repuestos.services.rate_service import SOURCE_LABELS
@@ -220,6 +221,8 @@ class MainWindow(QMainWindow):
                 f"• Fiado vencido: <b>{n}</b> cliente{'s' if n != 1 else ''} por <b>{format_usd(total)}</b>."
                 ' <a href="fiado">Ver deudores</a>'
             )
+        if self.user.is_owner and not recovery_service.has_code(self._conn):
+            alerts.append("• Falta el código de recuperación de su clave: genérelo en <b>Usuarios</b> y anótelo.")
         self._refresh_backup_label(alerts)
         self.alerts.setText("<br>".join(alerts))
 

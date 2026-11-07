@@ -41,3 +41,21 @@ def verify_password(password: str, stored: str) -> bool:
     except (ValueError, TypeError):
         return False
     return hmac.compare_digest(digest, expected)
+
+
+# ------------------------------------------------------------------ código de recuperación de la dueña
+
+RECOVERY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # sin 0/O ni 1/I/L: se copia a mano sin confusiones
+RECOVERY_GROUPS = 3
+RECOVERY_GROUP_LEN = 4
+
+
+def generate_recovery_code() -> str:
+    """Código de 12 caracteres al azar en grupos de 4 (≈ 60 bits): K7QM-3XR9-PW2H."""
+    chars = "".join(secrets.choice(RECOVERY_ALPHABET) for _ in range(RECOVERY_GROUPS * RECOVERY_GROUP_LEN))
+    return "-".join(chars[i : i + RECOVERY_GROUP_LEN] for i in range(0, len(chars), RECOVERY_GROUP_LEN))
+
+
+def normalize_recovery_code(text: str) -> str:
+    """Acepta minúsculas, espacios y guiones: «k7qm 3xr9 pw2h» = «K7QM-3XR9-PW2H»."""
+    return "".join(c for c in text.upper() if c.isalnum())

@@ -1,0 +1,26 @@
+VISITA DE INSTALACIÓN · ROMERO ALFA 1 · Borealis Repuestos
+==========================================================
+
+Josner: en esta carpeta está todo lo que necesitas para la visita.
+
+  BorealisRepuestos-1.0.0-instalador.exe   El programa (se instala en la PC de la tienda).
+  carpeta-de-la-visita.pdf                 Todos tus documentos juntos, para imprimir.
+  guia-rapida.pdf                          Hoja de una página para la dueña y el vendedor.
+  visita\                                  Los mismos documentos por separado.
+
+ANTES DE LA VISITA
+------------------
+1. Imprime: carpeta-de-la-visita.pdf (1 copia) y guia-rapida.pdf (2 copias).
+2. Lee los documentos 00 «El programa en 10 minutos» y 01 «Guía de la visita».
+3. Practica en TU computadora:
+   - Ejecuta el instalador. Si sale «Windows protegió su PC»: Más información → Ejecutar de todas formas.
+   - Abre «Borealis Repuestos (modo de prueba)» (franja amarilla). Crea la dueña de práctica:
+     usuario prueba, clave prueba123. Anota el código de recuperación que te muestra.
+   - Haz completas las pruebas del documento 02 en tu PC. Así llegas a la tienda sabiendo dónde está cada cosa.
+4. Copia esta carpeta completa a un pendrive y llévalo.
+5. Escribe en la guía (página 1) el WhatsApp de Gabriel para dudas durante la visita.
+
+EN LA TIENDA
+------------
+Sigue el documento 01 paso a paso. Las pruebas y la práctica SIEMPRE en «modo de prueba».
+Nunca borres la carpeta C:\ProgramData\BorealisRepuestos (son los datos de la tienda).

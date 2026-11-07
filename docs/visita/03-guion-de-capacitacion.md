@@ -18,6 +18,7 @@ Regla de oro: **ellas y ellos tocan el teclado, tú no.** Tú explicas, señalas
 | 10 min | Resumen del mes | Reportes → Resumen del mes → Ver. Explica cada línea: inversión, compras, ventas, ganancia bruta, pérdidas, por cobrar, resultado «antes de gastos». «Esto mismo le llega al celular en Google Drive cada vez que se cierra la caja.» |
 | 5 min | Fiado | Fiado → Clientes → Nuevo cliente → Configurar fiado (límite y plazo). Deudores: vencidas en rojo. Estado de cuenta. «La deuda queda en dólares para que no pierda valor.» |
 | 5 min | Tasa, respaldo, usuarios | Tasa BCV automática; si no hay internet, Cargar a mano. Respaldo: barra de abajo, Respaldar ahora. Usuarios: ella crea al vendedor y le puede restablecer la clave. Bitácora: quién hizo qué. |
+| 5 min | Si olvida su clave | En modo de prueba: Cerrar sesión → «¿Olvidó la clave de la dueña?» → código del papel → clave nueva. «Ese papel es la llave de su sistema: guárdelo como guarda las llaves del local. Si pierde el papel, en Usuarios → Código de recuperación saca uno nuevo.» |
 
 Cierra con: «Si algo no le cuadra, no borre nada: escríbale a Borealis por WhatsApp.»
 

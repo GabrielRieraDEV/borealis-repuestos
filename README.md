@@ -18,6 +18,16 @@ la impresora, el lector y Google Drive, y recorrer los 12 criterios con la dueñ
   aparte en `C:\ProgramData\BorealisRepuestos-prueba` para las pruebas de la visita y para practicar.
 - `docs/revision-final.md` — cada RF, RN y RNF con el archivo y la prueba que lo demuestran.
 
+## Soporte
+
+- **La dueña olvidó su clave:** en la pantalla de entrada, «¿Olvidó la clave de la dueña?» con el código de
+  recuperación que anotó en papel (se genera al configurar el sistema o en Usuarios → Código de recuperación).
+- **Perdió la clave y el código** (solo Borealis, con acceso a la PC; no viene en el instalador): cerrar el programa,
+  copiar `romero.db` a una PC con el entorno de desarrollo y correr
+  `python -m repuestos.tools.reset_owner --db romero.db`. Pide la clave nueva, genera un código nuevo y deja constancia
+  en la bitácora. Devolver el archivo a `C:\ProgramData\BorealisRepuestos\datos\`.
+- **Registro técnico:** `C:\ProgramData\BorealisRepuestos\logs\repuestos.log` (5 archivos de 1 MB).
+
 ## Cómo arrancar con Claude Code
 
 1. Crea el repositorio privado `borealis-repuestos` en GitHub y copia esta carpeta tal cual.
