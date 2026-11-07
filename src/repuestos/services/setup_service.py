@@ -9,6 +9,7 @@ from decimal import Decimal
 from repuestos.db.connection import transaction
 from repuestos.db.repositories import settings as settings_repo
 from repuestos.db.repositories import users as users_repo
+from repuestos.domain.money import hu
 from repuestos.domain.passwords import hash_password, validate_new_password
 from repuestos.domain.users import Role, User
 from repuestos.services.audit_service import audit
@@ -44,7 +45,7 @@ def validate(data: SetupData) -> None:
         raise ValueError("Escriba el RIF del negocio.")
     if data.rounding_multiple <= 0:
         raise ValueError("El múltiplo de redondeo debe ser mayor que cero (por ejemplo 5,00).")
-    if data.rounding_multiple != data.rounding_multiple.quantize(Decimal("0.01")):
+    if data.rounding_multiple != hu(data.rounding_multiple, 2):
         raise ValueError("El múltiplo de redondeo admite como máximo 2 decimales.")
 
 

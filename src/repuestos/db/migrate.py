@@ -38,9 +38,7 @@ def load_migrations() -> list[Migration]:
 
 
 def applied_versions(conn: sqlite3.Connection) -> set[int]:
-    exists = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'"
-    ).fetchone()
+    exists = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'").fetchone()
     if not exists:
         return set()
     return {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}

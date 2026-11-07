@@ -1,4 +1,4 @@
-"""Arranque: carpetas, log, base de datos y migraciones, primer arranque, login y ventana principal."""
+"""Arranque: carpetas, log, base de datos y migraciones, verificación de existencias, login y ventana principal."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from types import TracebackType
 from repuestos.config import APP_NAME, get_paths
 from repuestos.db import migrate
 from repuestos.db.connection import connect
-from repuestos.db.repositories import settings as settings_repo
 from repuestos.logging_setup import setup_logging
 
 log = logging.getLogger(__name__)
@@ -42,16 +41,16 @@ def main() -> int:
 
     from PySide6.QtWidgets import QApplication, QDialog
 
-    from repuestos.services import auth_service, setup_service
+    from repuestos.services import auth_service, settings_service, setup_service
+    from repuestos.tools.verify_stock import verify_and_log
     from repuestos.ui.login import LoginDialog
     from repuestos.ui.main_window import MainWindow
     from repuestos.ui.setup_wizard import SetupWizard
+    from repuestos.ui.theme import apply_theme
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
-    font = app.font()
-    font.setPointSize(11)
-    app.setFont(font)
+    apply_theme(app)
     _install_excepthook()
 
     if setup_service.needs_setup(conn):
@@ -59,16 +58,28 @@ def main() -> int:
         if wizard.exec() != QDialog.DialogCode.Accepted:
             return 0
 
-    business_name = settings_repo.get(conn, "business_name")
-    login = LoginDialog(conn, business_name)
-    if login.exec() != QDialog.DialogCode.Accepted or login.user is None:
-        return 0
-    user = login.user
+    apply_theme(app, settings_service.load(conn).large_font)
 
-    window = MainWindow(user, business_name)
-    window.show()
-    code = app.exec()
-    auth_service.logout(conn, user)
+    # RF-44: silenciosa si todo cuadra; si no, bitácora y aviso a la dueña
+    mismatches = verify_and_log(conn)
+    if mismatches:
+        log.warning("verify_stock: %d producto(s) con diferencias", len(mismatches))
+
+    code = 0
+    while True:
+        login = LoginDialog(conn, settings_service.load(conn).business_name)
+        if login.exec() != QDialog.DialogCode.Accepted or login.user is None:
+            break
+        user = login.user
+        window = MainWindow(conn, user)
+        window.show()
+        if mismatches and user.is_owner:
+            window.show_stock_mismatch(len(mismatches))
+            mismatches = []
+        code = app.exec()
+        auth_service.logout(conn, user)
+        if not window.logout_requested:
+            break
     conn.close()
     log.info("Cierre normal")
     return code

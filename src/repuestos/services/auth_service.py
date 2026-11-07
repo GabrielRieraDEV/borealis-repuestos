@@ -50,8 +50,7 @@ def login(conn: sqlite3.Connection, username: str, password: str, now: datetime 
                 users_repo.set_login_failure(conn, row.user.id, 0, locked_until)
                 audit(conn, row.user.id, "USER_LOCKED", "user", row.user.id, {"until": locked_until})
                 error = (
-                    f"Contraseña incorrecta {MAX_ATTEMPTS} veces. "
-                    f"El usuario quedó bloqueado {LOCK_MINUTES} minutos."
+                    f"Contraseña incorrecta {MAX_ATTEMPTS} veces. El usuario quedó bloqueado {LOCK_MINUTES} minutos."
                 )
             else:
                 users_repo.set_login_failure(conn, row.user.id, attempts, None)

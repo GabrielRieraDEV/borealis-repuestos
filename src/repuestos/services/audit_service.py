@@ -31,7 +31,5 @@ def audit(
 ) -> int:
     if not conn.in_transaction:
         raise RuntimeError("audit() debe llamarse dentro de la transacción de la operación")
-    details_json = (
-        json.dumps(details, ensure_ascii=False, sort_keys=True, default=_default) if details else None
-    )
+    details_json = json.dumps(details, ensure_ascii=False, sort_keys=True, default=_default) if details else None
     return audit_repo.insert(conn, user_id, action, entity, entity_id, details_json, authorized_by)

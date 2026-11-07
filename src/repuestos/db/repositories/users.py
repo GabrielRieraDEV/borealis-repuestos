@@ -59,3 +59,23 @@ def set_login_failure(conn: sqlite3.Connection, user_id: int, failed_attempts: i
 
 def reset_login_state(conn: sqlite3.Connection, user_id: int) -> None:
     conn.execute("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?", (user_id,))
+
+
+def list_all(conn: sqlite3.Connection) -> list[User]:
+    return [_to_user(r) for r in conn.execute("SELECT * FROM users ORDER BY role, full_name COLLATE NOCASE")]
+
+
+def active_owner_hashes(conn: sqlite3.Connection) -> list[tuple[int, str]]:
+    rows = conn.execute("SELECT id, password_hash FROM users WHERE role = 'owner' AND active = 1 ORDER BY id")
+    return [(r["id"], r["password_hash"]) for r in rows]
+
+
+def set_active(conn: sqlite3.Connection, user_id: int, active: bool) -> None:
+    conn.execute("UPDATE users SET active = ? WHERE id = ?", (int(active), user_id))
+
+
+def set_password_hash(conn: sqlite3.Connection, user_id: int, password_hash: str) -> None:
+    conn.execute(
+        "UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?",
+        (password_hash, user_id),
+    )

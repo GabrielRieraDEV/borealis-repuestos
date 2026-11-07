@@ -37,9 +37,7 @@ def verify_password(password: str, stored: str) -> bool:
             return False
         salt = base64.b64decode(salt_b64)
         expected = base64.b64decode(hash_b64)
-        digest = hashlib.scrypt(
-            password.encode("utf-8"), salt=salt, n=int(n), r=int(r), p=int(p), dklen=len(expected)
-        )
+        digest = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=int(n), r=int(r), p=int(p), dklen=len(expected))
     except (ValueError, TypeError):
         return False
     return hmac.compare_digest(digest, expected)

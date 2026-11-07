@@ -148,9 +148,7 @@ def credit_payment_usd(amount: Decimal, currency: Currency, current_rate: Decima
 # ------------------------------------------------------------------ RN-08
 
 
-def weighted_average_cost(
-    stock_before: Decimal, cost_before: Decimal, qty: Decimal, purchase_cost: Decimal
-) -> Decimal:
+def weighted_average_cost(stock_before: Decimal, cost_before: Decimal, qty: Decimal, purchase_cost: Decimal) -> Decimal:
     """RN-08: costo promedio ponderado tras un renglón de compra (4 decimales).
 
     Si la existencia anterior es <= 0, el costo nuevo es el de la compra.
