@@ -37,7 +37,7 @@ from repuestos.domain.money import hu
 log = logging.getLogger(__name__)
 
 BCV_URL = "https://www.bcv.org.ve/"
-TIMEOUT_SECONDS = 10.0
+TIMEOUT_SECONDS = 10
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BorealisRepuestos/1.0"
 
 
@@ -126,7 +126,7 @@ def _ssl_context() -> ssl.SSLContext | bool:
         return True
 
 
-def fetch_bcv_rate(url: str = BCV_URL, timeout: float = TIMEOUT_SECONDS) -> BcvRate:
+def fetch_bcv_rate(url: str = BCV_URL, timeout: int = TIMEOUT_SECONDS) -> BcvRate:
     """Descarga y lee la tasa. Lanza BcvError ante cualquier falla (el llamador sigue sin interrumpir nada)."""
     try:
         with httpx.Client(

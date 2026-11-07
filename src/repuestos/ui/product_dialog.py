@@ -10,9 +10,10 @@ from __future__ import annotations
 import sqlite3
 from decimal import Decimal
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QFormLayout,
@@ -20,17 +21,21 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from repuestos.domain.inventory import MOVEMENT_LABELS
 from repuestos.domain.money import hu
 from repuestos.domain.pricing import unit_price_ves
 from repuestos.domain.products import UNIT_LABELS, UNIT_SHORT, Product, ProductData, Unit
 from repuestos.domain.users import User
-from repuestos.services import category_service, product_service, rate_service, settings_service
+from repuestos.services import category_service, inventory_service, product_service, rate_service, settings_service
 from repuestos.ui.common import EnterMovesFocusDialog, format_qty, read_decimal, run_action
-from repuestos.ui.formatting import format_number, format_ves, parse_decimal
+from repuestos.ui.formatting import format_date, format_number, format_usd, format_ves, parse_decimal
 
 FRACTION_UNITS = {Unit.METRO, Unit.LITRO}
 
@@ -41,6 +46,24 @@ def money_text(value: Decimal) -> str:
     while text.endswith("0") and len(text.split(",")[1]) > 2:
         text = text[:-1]
     return text
+
+
+def _table(headers: list[str]) -> QTableWidget:
+    t = QTableWidget(0, len(headers))
+    t.setHorizontalHeaderLabels(headers)
+    t.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+    t.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+    t.verticalHeader().setVisible(False)
+    t.horizontalHeader().setStretchLastSection(True)
+    return t
+
+
+def _fill_row(table: QTableWidget, row: int, values: list[tuple[str, bool]]) -> None:
+    for col, (text, right) in enumerate(values):
+        item = QTableWidgetItem(text)
+        if right:
+            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        table.setItem(row, col, item)
 
 
 class ProductDialog(EnterMovesFocusDialog):
@@ -67,6 +90,8 @@ class ProductDialog(EnterMovesFocusDialog):
         self._build(settings.default_min_stock)
         if product_id is not None:
             self._load(product_id)
+            if self.tabs is not None:
+                self._load_history(product_id)
         self._set_title()
         if self._read_only:
             self._make_read_only()
@@ -143,7 +168,22 @@ class ProductDialog(EnterMovesFocusDialog):
             QShortcut(QKeySequence(seq), self, activated=lambda: self._save(again=True))
 
         layout = QVBoxLayout(self)
-        layout.addLayout(form)
+        self.tabs: QTabWidget | None = None
+        if self._product_id is not None and self._user.is_owner:
+            data_tab = QWidget()
+            data_tab.setLayout(form)
+            self.kardex_table = _table(
+                ["Fecha", "Movimiento", "Cantidad", "Existencia", "Costo prom. USD", "Usuario", "Documento o motivo"]
+            )
+            self.history_table = _table(["Fecha", "Proveedor", "Factura", "Cantidad", "Costo unit. USD", "Estado"])
+            self.tabs = QTabWidget()
+            self.tabs.addTab(data_tab, "Datos")
+            self.tabs.addTab(self.kardex_table, "Movimientos")
+            self.tabs.addTab(self.history_table, "Historial de compras")
+            layout.addWidget(self.tabs)
+            self.resize(900, 640)
+        else:
+            layout.addLayout(form)
         layout.addLayout(buttons)
 
         is_new = self._product_id is None
@@ -194,6 +234,46 @@ class ProductDialog(EnterMovesFocusDialog):
             self.cost.setText(money_text(cost))
         self.min_stock.setText(format_qty(min_stock, fraction))
         self.stock_label.setText(f"{format_qty(stock, fraction)} {UNIT_SHORT[unit]}")
+
+    def _load_history(self, product_id: int) -> None:
+        """RF-16: kardex e historial de compras."""
+        fraction = self.allows_fraction.isChecked()
+        lines = inventory_service.kardex(self._conn, self._user, product_id)
+        self.kardex_table.setRowCount(len(lines))
+        for row, k in enumerate(lines):
+            if k.purchase_id is not None:
+                doc = f"Compra a {k.supplier_name}" + (f", factura {k.supplier_invoice}" if k.supplier_invoice else "")
+                if k.reason:
+                    doc += f" — {k.reason}"
+            elif k.sale_number is not None:
+                doc = f"NE-{k.sale_number:06d}" + (f" — {k.reason}" if k.reason else "")
+            else:
+                doc = k.reason
+            sign = "+" if k.qty > 0 else "−"
+            values = [
+                (format_date(k.created_at) + k.created_at[10:16], False),
+                (MOVEMENT_LABELS[k.kind], False),
+                (sign + format_qty(abs(k.qty), fraction), True),
+                (format_qty(k.stock_after, fraction), True),
+                (format_usd(k.unit_cost, 4), True),
+                (k.user_name, False),
+                (doc, False),
+            ]
+            _fill_row(self.kardex_table, row, values)
+        self.kardex_table.resizeColumnsToContents()
+        history = inventory_service.purchase_history(self._conn, self._user, product_id)
+        self.history_table.setRowCount(len(history))
+        for row, h in enumerate(history):
+            values = [
+                (format_date(h.purchase_date), False),
+                (h.supplier_name, False),
+                (h.supplier_invoice, False),
+                (format_qty(h.qty, fraction), True),
+                (format_usd(h.unit_cost, 4), True),
+                ("ANULADA" if h.voided else "", False),
+            ]
+            _fill_row(self.history_table, row, values)
+        self.history_table.resizeColumnsToContents()
 
     def _make_read_only(self) -> None:
         for w in (self.barcode, self.name, self.brand, self.models, self.location, self.price, self.min_stock):

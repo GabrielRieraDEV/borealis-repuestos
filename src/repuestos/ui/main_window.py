@@ -13,7 +13,9 @@ from repuestos.services import product_service, rate_service, settings_service
 from repuestos.services.rate_service import SOURCE_LABELS
 from repuestos.ui.admin_dialogs import CategoriesDialog, SettingsDialog, UsersDialog
 from repuestos.ui.formatting import format_date, format_rate
+from repuestos.ui.inventory_window import InventoryWindow
 from repuestos.ui.products_window import ProductsWindow
+from repuestos.ui.purchases_window import PurchasesWindow
 from repuestos.ui.rate import FETCH_INTERVAL_MS, BcvFetcher, RateDialog
 
 NEXT_VERSION = "Disponible en una próxima actualización."
@@ -79,7 +81,13 @@ class MainWindow(QMainWindow):
         buttons = [
             self._big_button("Vender", enabled=False),
             self._big_button("Productos (F3)", self.open_products),
-            self._big_button("Compras", enabled=False),
+        ]
+        if owner:
+            buttons += [
+                self._big_button("Compras", self.open_purchases),
+                self._big_button("Inventario", lambda: self.open_inventory(0)),
+            ]
+        buttons += [
             self._big_button("Caja", enabled=False),
             self._big_button("Fiado", enabled=False),
             self._big_button("Reportes", enabled=False),
@@ -102,6 +110,7 @@ class MainWindow(QMainWindow):
         self.alerts.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self.alerts.setStyleSheet("font-size: 13pt;")
         self.alerts.setWordWrap(True)
+        self.alerts.linkActivated.connect(self._alert_link)
 
         center = QWidget()
         layout = QVBoxLayout(center)
@@ -140,7 +149,10 @@ class MainWindow(QMainWindow):
                 alerts.append("• La tasa tiene más de 3 días. Revise <b>Tasa BCV</b>.")
         low = product_service.count_low_stock(self._conn)
         if low:
-            alerts.append(f"• Para pedir: <b>{low}</b> producto{'s' if low != 1 else ''} en el mínimo o por debajo.")
+            text = f"• Para pedir: <b>{low}</b> producto{'s' if low != 1 else ''} en el mínimo o por debajo."
+            if self.user.is_owner:
+                text += ' <a href="pedir">Ver la lista</a>'
+            alerts.append(text)
         self.alerts.setText("<br>".join(alerts))
 
     # ------------------------------------------------------------------ acciones
@@ -148,6 +160,18 @@ class MainWindow(QMainWindow):
     def open_products(self) -> None:
         ProductsWindow(self._conn, self.user, self).exec()
         self.refresh_status()
+
+    def open_purchases(self) -> None:
+        PurchasesWindow(self._conn, self.user, self).exec()
+        self.refresh_status()
+
+    def open_inventory(self, tab: int = 0) -> None:
+        InventoryWindow(self._conn, self.user, self, tab=tab).exec()
+        self.refresh_status()
+
+    def _alert_link(self, link: str) -> None:
+        if link == "pedir" and self.user.is_owner:
+            self.open_inventory(0)
 
     def open_rate(self) -> None:
         RateDialog(self._conn, self.user, self.fetcher, self).exec()

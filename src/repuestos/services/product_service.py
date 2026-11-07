@@ -9,7 +9,6 @@ from decimal import Decimal
 
 from repuestos.db.connection import transaction
 from repuestos.db.repositories import categories as categories_repo
-from repuestos.db.repositories import inventory as inventory_repo
 from repuestos.db.repositories import products as repo
 from repuestos.domain.inventory import MovementType
 from repuestos.domain.pricing import check_quantity, unit_price_ves
@@ -18,6 +17,7 @@ from repuestos.domain.text import build_search_text, search_words
 from repuestos.domain.users import User, require_owner
 from repuestos.services import rate_service, settings_service
 from repuestos.services.audit_service import audit
+from repuestos.services.stock import apply_movement
 
 SEARCH_LIMIT = 200
 
@@ -113,17 +113,7 @@ def create_product(
         code = repo.next_code(conn)
         product_id = repo.insert(conn, code, data, _search_text(conn, code, data))
         if initial_stock > 0:
-            inventory_repo.insert_movement(
-                conn,
-                product_id,
-                MovementType.INITIAL,
-                initial_stock,
-                initial_stock,
-                data.cost_usd,
-                user.id,
-                reason="Existencia inicial",
-            )
-            repo.set_stock(conn, product_id, initial_stock)
+            apply_movement(conn, product_id, MovementType.INITIAL, initial_stock, user.id, reason="Existencia inicial")
         audit(
             conn,
             user.id,

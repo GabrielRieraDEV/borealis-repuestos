@@ -80,6 +80,13 @@ def update(conn: sqlite3.Connection, product_id: int, data: ProductData, search_
     )
 
 
+def set_cost(conn: sqlite3.Connection, product_id: int, cost: Decimal) -> None:
+    conn.execute(
+        "UPDATE products SET cost_usd_e4 = ?, updated_at = datetime('now', 'localtime') WHERE id = ?",
+        (to_db(cost, "e4"), product_id),
+    )
+
+
 def set_search_text(conn: sqlite3.Connection, product_id: int, search_text: str) -> None:
     conn.execute("UPDATE products SET search_text = ? WHERE id = ?", (search_text, product_id))
 
@@ -124,6 +131,8 @@ def search(
     exact: str | None,
     include_inactive: bool,
     limit: int,
+    category_id: int | None = None,
+    location: str | None = None,
 ) -> list[Product]:
     """RF-12: cada palabra debe aparecer en search_text (AND), en cualquier orden.
 
@@ -136,6 +145,12 @@ def search(
         params.append(_like(w))
     if not include_inactive:
         where.append("p.active = 1")
+    if category_id is not None:
+        where.append("p.category_id = ?")
+        params.append(category_id)
+    if location:
+        where.append("p.location = ? COLLATE NOCASE")
+        params.append(location)
     order = "p.name COLLATE NOCASE, p.id"
     order_params: list[object] = []
     if exact:
@@ -162,3 +177,10 @@ def count_low_stock(conn: sqlite3.Connection) -> int:
     return conn.execute(
         "SELECT COUNT(*) FROM products WHERE active = 1 AND min_stock_e3 > 0 AND stock_e3 <= min_stock_e3"
     ).fetchone()[0]
+
+
+def locations(conn: sqlite3.Connection) -> list[str]:
+    rows = conn.execute(
+        "SELECT DISTINCT location FROM products WHERE active = 1 AND location <> '' ORDER BY location COLLATE NOCASE"
+    )
+    return [r[0] for r in rows]

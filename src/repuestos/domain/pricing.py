@@ -174,3 +174,12 @@ def pack_purchase(packs: Decimal, units_per_pack: Decimal, pack_cost: Decimal) -
     if packs <= 0 or units_per_pack <= 0:
         raise ValueError("empaques y unidades por empaque deben ser mayores que cero")
     return PackPurchase(qty=mul(packs, units_per_pack), unit_cost=hu(div(pack_cost, units_per_pack), 4))
+
+
+def purchase_line_total(qty: Decimal, unit_cost: Decimal) -> Decimal:
+    """Total del renglón de compra en USD: HU(cantidad × costo unitario, 2). El total de la compra es la suma."""
+    if qty <= 0:
+        raise ValueError("La cantidad comprada debe ser mayor que cero.")
+    if unit_cost < 0:
+        raise ValueError("El costo no puede ser negativo.")
+    return hu(mul(qty, unit_cost), 2)

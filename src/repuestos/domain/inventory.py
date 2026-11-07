@@ -50,3 +50,41 @@ def check_movement_sign(kind: MovementType, qty: Decimal) -> None:
         raise ValueError(f"El movimiento {kind} debe sumar existencia.")
     if kind in NEGATIVE and qty > 0:
         raise ValueError(f"El movimiento {kind} debe restar existencia.")
+
+
+class AdjustmentKind(StrEnum):
+    """Ajustes manuales de la dueña (RF-41). El conteo físico (RF-42) usa ADJ_COUNT aparte."""
+
+    DAMAGE = "DAMAGE"
+    MISSING = "MISSING"
+    INTERNAL_USE = "INTERNAL_USE"
+    CORRECTION_IN = "CORRECTION_IN"
+
+
+ADJUSTMENT_MOVEMENT = {
+    AdjustmentKind.DAMAGE: MovementType.ADJ_DAMAGE,
+    AdjustmentKind.MISSING: MovementType.ADJ_MISSING,
+    AdjustmentKind.INTERNAL_USE: MovementType.ADJ_INTERNAL_USE,
+    AdjustmentKind.CORRECTION_IN: MovementType.ADJ_CORRECTION_IN,
+}
+
+ADJUSTMENT_LABELS = {
+    AdjustmentKind.DAMAGE: "Dañado",
+    AdjustmentKind.MISSING: "Faltante",
+    AdjustmentKind.INTERNAL_USE: "Uso interno",
+    AdjustmentKind.CORRECTION_IN: "Entrada por corrección",
+}
+
+
+def adjustment_qty(kind: AdjustmentKind, qty: Decimal) -> Decimal:
+    """La usuaria escribe una cantidad positiva; el signo lo pone el tipo (RN-09)."""
+    if qty <= 0:
+        raise ValueError("La cantidad del ajuste debe ser mayor que cero.")
+    return qty if kind is AdjustmentKind.CORRECTION_IN else -qty
+
+
+def count_difference(counted: Decimal, system_stock: Decimal) -> Decimal:
+    """RN-09: diferencia = contado − existencia del sistema."""
+    if counted < 0:
+        raise ValueError("Lo contado no puede ser negativo.")
+    return counted - system_stock
